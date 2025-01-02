@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test-add-git-sha-to-quay-image-tag
   workflow_dispatch:
 
 jobs:
