@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -54,7 +55,9 @@ var _ = Describe("agent handler", Ordered, func() {
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 
-			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
+			withExample := true
+			params := v1alpha1.ListAgentsParams{WithExample: &withExample}
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{Params: params})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
 			Expect(resp).To(HaveLen(2))
@@ -71,7 +74,9 @@ var _ = Describe("agent handler", Ordered, func() {
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 
-			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
+			withExample := true
+			params := v1alpha1.ListAgentsParams{WithExample: &withExample}
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{Params: params})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
 			Expect(resp).To(HaveLen(2))
@@ -91,7 +96,11 @@ var _ = Describe("agent handler", Ordered, func() {
 				Organization: "admin",
 			}
 			ctx := auth.NewUserContext(context.TODO(), user)
-			resp, err := srv.ListAgents(ctx, server.ListAgentsRequestObject{})
+
+			withExample := true
+			params := v1alpha1.ListAgentsParams{WithExample: &withExample}
+
+			resp, err := srv.ListAgents(ctx, server.ListAgentsRequestObject{Params: params})
 
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
