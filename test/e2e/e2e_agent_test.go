@@ -5,17 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
-
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/client"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
 )
 
 const (
@@ -34,6 +34,7 @@ type PlannerAgent interface {
 	Run() error
 	Login(url string, user string, pass string) (*http.Response, error)
 	Version() (string, error)
+	Restart() error
 	Remove() error
 	GetIp() (string, error)
 	IsServiceRunning(string, string) bool
@@ -183,6 +184,43 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http
 }
 
 func (p *plannerAgentLibvirt) RestartService() error {
+	return nil
+}
+
+func (p *plannerAgentLibvirt) Restart() error {
+	domain, err := p.con.LookupDomainByName(p.name)
+	if err != nil {
+		return err
+	}
+
+	err = domain.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	// waits maximum 30 sec for completely shutdown
+	for {
+		count := 0
+		state, _, err := domain.GetState()
+		if err != nil {
+			return err
+		}
+		if state == libvirt.DOMAIN_SHUTOFF {
+			break
+		}
+
+		if count += 1; count >= 30 {
+			return fmt.Errorf("timed out waiting for shutdown")
+		}
+		time.Sleep(time.Second)
+	}
+
+	// Now start the domain again
+	err = domain.Create()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
