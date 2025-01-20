@@ -151,6 +151,7 @@ var _ = Describe("e2e", func() {
 			time.Sleep(time.Second * 40)
 			fmt.Println("sleep finished")
 
+			// check if ip has changed
 			fmt.Println("fetch the current agent ip...")
 			Eventually(func() string {
 				agentIP, err = agent.GetIp()
@@ -159,12 +160,12 @@ var _ = Describe("e2e", func() {
 				}
 				return agentIP
 			}, "1m", "3s").ShouldNot(BeEmpty())
-
 			fmt.Println(fmt.Sprintf("current agent ip is: %s", agentIP))
 
 			Eventually(func() bool {
 				apiAgent, err := svc.GetAgent(fmt.Sprintf("http://%s:3333", agentIP))
 				if err != nil {
+					fmt.Println(fmt.Sprintf("this is the error from line 168:\n %s", err.Error()))
 					return false
 				}
 				return apiAgent.Status == v1alpha1.AgentStatusUpToDate
