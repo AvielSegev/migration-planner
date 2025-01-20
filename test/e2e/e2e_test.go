@@ -135,6 +135,9 @@ var _ = Describe("e2e", func() {
 			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
 			Expect(err).To(BeNil())
 
+			fmt.Println(fmt.Sprintf("vcsim ip is: %s", systemIP))
+			fmt.Println(fmt.Sprintf("original agent ip is: %s", agentIP))
+
 			fmt.Println("login Successful to vscim")
 
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -147,7 +150,18 @@ var _ = Describe("e2e", func() {
 			fmt.Println("sleep until the machine boot up")
 			time.Sleep(time.Second * 40)
 			fmt.Println("sleep finished")
-			
+
+			fmt.Println("fetch the current agent ip...")
+			Eventually(func() string {
+				agentIP, err = agent.GetIp()
+				if err != nil {
+					return ""
+				}
+				return agentIP
+			}, "1m", "3s").ShouldNot(BeEmpty())
+
+			fmt.Println(fmt.Sprintf("current agent ip is: %s", agentIP))
+
 			Eventually(func() bool {
 				apiAgent, err := svc.GetAgent(fmt.Sprintf("http://%s:3333", agentIP))
 				if err != nil {
