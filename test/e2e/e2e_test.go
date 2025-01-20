@@ -168,6 +168,7 @@ var _ = Describe("e2e", func() {
 					fmt.Println(fmt.Sprintf("this is the error from line 168:\n %s", err.Error()))
 					return false
 				}
+				fmt.Println("the get agent succeed, if there is a problem it probably the status code")
 				return apiAgent.Status == v1alpha1.AgentStatusUpToDate
 			}, "1m", "2s").Should(BeTrue())
 		})

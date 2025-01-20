@@ -193,6 +193,10 @@ func (p *plannerAgentLibvirt) Restart() error {
 		return err
 	}
 
+	defer func() {
+		_ = domain.Free()
+	}()
+
 	err = domain.Shutdown()
 	if err != nil {
 		return err
