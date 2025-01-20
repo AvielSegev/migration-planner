@@ -133,10 +133,12 @@ var _ = Describe("e2e", func() {
 			// Put the vCenter credentials and check that source is up to date eventually
 			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
 			Expect(err).To(BeNil())
+			fmt.Println("login Successful to vscim")
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
 			// Restarting the VM
 			err = agent.Restart()
 			Expect(err).To(BeNil())
+			fmt.Println("agent restart Successfully passed")
 			Eventually(func() bool {
 				apiAgent, err := svc.GetAgent(fmt.Sprintf("http://%s:3333", agentIP))
 				if err != nil {
