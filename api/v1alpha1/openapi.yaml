@@ -661,7 +661,7 @@ components:
           type: string
         status:
           type: string
-          enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone]
+          enum: [not-connected, not-connected-to-service, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone]
         statusInfo:
           type: string
         credentialUrl:

@@ -20,11 +20,12 @@ const (
 )
 
 type StatusUpdater struct {
-	agentID uuid.UUID
-	version string
-	config  *config.Config
-	client  client.Planner
-	credUrl string
+	agentID       uuid.UUID
+	version       string
+	config        *config.Config
+	client        client.Planner
+	credUrl       string
+	HealthChecker *HealthChecker
 }
 
 func NewStatusUpdater(agentID uuid.UUID, version, credUrl string, config *config.Config, client client.Planner) *StatusUpdater {
@@ -55,6 +56,7 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Inventory) {
 	inventoryFilePath := filepath.Join(s.config.DataDir, config.InventoryFile)
 	credentialsFilePath := filepath.Join(s.config.DataDir, config.CredentialsFile)
+
 	reader := fileio.NewReader()
 
 	err := reader.CheckPathExists(credentialsFilePath)
@@ -77,5 +79,10 @@ func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Invento
 	if len(inventory.Error) > 0 {
 		return api.AgentStatusError, inventory.Error, &inventory.Inventory
 	}
+
+	if s.HealthChecker != nil && s.HealthChecker.State() == HealthCheckStateConsoleUnreachable {
+		return api.AgentStatusNotConnectedToService, "Migration Planner service is unreachable", &inventory.Inventory
+	}
+
 	return api.AgentStatusUpToDate, "Inventory successfully collected", &inventory.Inventory
 }

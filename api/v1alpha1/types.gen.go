@@ -14,6 +14,7 @@ const (
 	AgentStatusError                     AgentStatus = "error"
 	AgentStatusGatheringInitialInventory AgentStatus = "gathering-initial-inventory"
 	AgentStatusNotConnected              AgentStatus = "not-connected"
+	AgentStatusNotConnectedToService     AgentStatus = "not-connected-to-service"
 	AgentStatusSourceGone                AgentStatus = "source-gone"
 	AgentStatusUpToDate                  AgentStatus = "up-to-date"
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
