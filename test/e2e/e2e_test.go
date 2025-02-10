@@ -123,4 +123,24 @@ var _ = Describe("e2e", func() {
 			}, "1m", "2s").Should(BeTrue())
 		})
 	})
+
+	Context("Edge cases", func() {
+		It("Validate connection after VM reboot", func() {
+			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+
+			// Restarting the VM
+			err = agent.Restart()
+			Expect(err).To(BeNil())
+
+			Eventually(func() bool {
+				source, err := svc.GetSource(source.Id)
+				if err != nil {
+					return false
+				}
+				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+			}, "2m").Should(BeTrue())
+		})
+	})
 })
