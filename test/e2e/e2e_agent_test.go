@@ -49,6 +49,7 @@ type PlannerAgent interface {
 
 type PlannerService interface {
 	RemoveSources() error
+	RemoveSource(id uuid.UUID) error
 	GetSource(id uuid.UUID) (*api.Source, error)
 	CreateSource(name string) (*api.Source, error)
 }
@@ -396,6 +397,17 @@ func (s *plannerService) RemoveSources() error {
 	ctx := auth.NewUserContext(context.TODO(), user)
 
 	_, err := s.c.DeleteSourcesWithResponse(ctx)
+	return err
+}
+
+func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
+	user := auth.User{
+		Username:     "admin",
+		Organization: "admin",
+	}
+	ctx := auth.NewUserContext(context.TODO(), user)
+
+	_, err := s.c.DeleteSourceWithResponse(ctx, uuid)
 	return err
 }
 
