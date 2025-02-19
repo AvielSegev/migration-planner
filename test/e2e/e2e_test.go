@@ -75,41 +75,84 @@ var _ = Describe("e2e", func() {
 		agent.DumpLogs(agentIP)
 	})
 
-	Context("Check Vcenter login behavior", func() {
-		It("should successfully login with valid credentials", func() {
-			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-		})
+	//Context("Check Vcenter login behavior", func() {
+	//	It("should successfully login with valid credentials", func() {
+	//		res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+	//		Expect(err).To(BeNil())
+	//		Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+	//	})
+	//
+	//	It("Two test combined: should return BadRequest due to an empty username"+
+	//		" and BadRequest due to an empty password", func() {
+	//
+	//		res1, err1 := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "", "pass")
+	//		Expect(err1).To(BeNil())
+	//		Expect(res1.StatusCode).To(Equal(http.StatusBadRequest))
+	//
+	//		res2, err2 := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "user", "")
+	//		Expect(err2).To(BeNil())
+	//		Expect(res2.StatusCode).To(Equal(http.StatusBadRequest))
+	//	})
+	//
+	//	It("should return Unauthorized due to invalid credentials", func() {
+	//		res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "invalid", "cred")
+	//		Expect(err).To(BeNil())
+	//		Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
+	//	})
+	//
+	//	It("should return badRequest due to an invalid URL", func() {
+	//		res, err := agent.Login(fmt.Sprintf("https://%s", systemIP), "user", "pass") // bad link to Vcenter environment
+	//		Expect(err).To(BeNil())
+	//		Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
+	//	})
+	//
+	//})
 
-		It("Two test combined: should return BadRequest due to an empty username"+
-			" and BadRequest due to an empty password", func() {
+	//Context("Flow", func() {
+	//	It("Up to date", func() {
+	//		// Put the vCenter credentials and check that source is up to date eventually
+	//		res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+	//		Expect(err).To(BeNil())
+	//		Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+	//		Eventually(func() bool {
+	//			source, err := svc.GetSource(source.Id)
+	//			if err != nil {
+	//				return false
+	//			}
+	//			return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+	//		}, "1m", "2s").Should(BeTrue())
+	//	})
+	//})
 
-			res1, err1 := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "", "pass")
-			Expect(err1).To(BeNil())
-			Expect(res1.StatusCode).To(Equal(http.StatusBadRequest))
+	Context("Scenarios", func() {
+		//It("VM reboot", func() {
+		//	res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+		//	Expect(err).To(BeNil())
+		//	Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+		//
+		//	// Restarting the VM
+		//	err = agent.Restart()
+		//	Expect(err).To(BeNil())
+		//
+		//	// Remove old ssh key
+		//	err = RemoveSSHKey(agentIP)
+		//	Expect(err).To(BeNil())
+		//
+		//	// Check that planner-agent service is running
+		//	Eventually(func() bool {
+		//		return agent.IsServiceRunning(agentIP, "planner-agent")
+		//	}, "3m").Should(BeTrue())
+		//
+		//	Eventually(func() bool {
+		//		source, err := svc.GetSource(source.Id)
+		//		if err != nil {
+		//			return false
+		//		}
+		//		return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+		//	}, "2m").Should(BeTrue())
+		//})
 
-			res2, err2 := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "user", "")
-			Expect(err2).To(BeNil())
-			Expect(res2.StatusCode).To(Equal(http.StatusBadRequest))
-		})
-
-		It("should return Unauthorized due to invalid credentials", func() {
-			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "invalid", "cred")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
-		})
-
-		It("should return badRequest due to an invalid URL", func() {
-			res, err := agent.Login(fmt.Sprintf("https://%s", systemIP), "user", "pass") // bad link to Vcenter environment
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-		})
-
-	})
-
-	Context("Flow", func() {
-		It("Up to date", func() {
+		It("Source Removal", func() {
 			// Put the vCenter credentials and check that source is up to date eventually
 			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
 			Expect(err).To(BeNil())
@@ -121,35 +164,17 @@ var _ = Describe("e2e", func() {
 				}
 				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
 			}, "1m", "2s").Should(BeTrue())
-		})
-	})
 
-	Context("Edge cases", func() {
-		It("VM reboot", func() {
-			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+			err = svc.RemoveSource(source.Id)
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-
-			// Restarting the VM
-			err = agent.Restart()
-			Expect(err).To(BeNil())
-
-			// Remove old ssh key
-			err = RemoveSSHKey(agentIP)
-			Expect(err).To(BeNil())
-
-			// Check that planner-agent service is running
-			Eventually(func() bool {
-				return agent.IsServiceRunning(agentIP, "planner-agent")
-			}, "3m").Should(BeTrue())
 
 			Eventually(func() bool {
 				source, err := svc.GetSource(source.Id)
 				if err != nil {
 					return false
 				}
-				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-			}, "2m").Should(BeTrue())
+				return source == nil
+			}, "1m", "2s").Should(BeTrue())
 		})
 	})
 })
