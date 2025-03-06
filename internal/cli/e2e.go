@@ -17,6 +17,7 @@ type E2ETestOptions struct {
 	clusterName               string
 	plannerAPIImage           string
 	plannerAPIImagePullPolicy string
+	plannerAuth               string
 	containerRuntime          string
 	localRegistryPort         string
 	pkgManager                string
@@ -35,6 +36,7 @@ const (
 	defaultRegistryPort       = "5000"
 	defaultPlannerServicePort = "3443"
 	defaultDestroyEnv         = true
+	defaultPlannerAuth        = "local"
 )
 
 func DefaultE2EOptions() *E2ETestOptions {
@@ -47,6 +49,7 @@ func DefaultE2EOptions() *E2ETestOptions {
 		clusterName:               defaultClusterName,
 		plannerAPIImage:           defaultPlannerAPIImage,
 		plannerAPIImagePullPolicy: defaultPullPolicy,
+		plannerAuth:               defaultPlannerAuth,
 		containerRuntime:          defaultContainerRuntime,
 		localRegistryPort:         defaultRegistryPort,
 		insecureRegistryAddr:      defaultInsecureRegistry,
@@ -133,9 +136,10 @@ func (o *E2ETestOptions) configureEnvironment() error {
 		"MIGRATION_PLANNER_AGENT_IMAGE":           o.agentImage,
 		"MIGRATION_PLANNER_API_IMAGE":             o.plannerAPIImage,
 		"MIGRATION_PLANNER_API_IMAGE_PULL_POLICY": o.plannerAPIImagePullPolicy,
-		"PODMAN":      o.containerRuntime,
-		"PKG_MANAGER": o.pkgManager,
-		"IFACE":       o.iface,
+		"MIGRATION_PLANNER_AUTH":                  o.plannerAuth,
+		"PODMAN":                                  o.containerRuntime,
+		"PKG_MANAGER":                             o.pkgManager,
+		"IFACE":                                   o.iface,
 	}
 
 	for key, value := range envVars {
