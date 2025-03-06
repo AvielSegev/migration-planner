@@ -71,20 +71,27 @@ func newPrivateKeyCmd() *cobra.Command {
 		Use:   "private-key",
 		Short: "Generate a private key",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+			privateKey, err := generatePrivateKey()
 			if err != nil {
-				return err
+				fmt.Println(privateKey)
 			}
-			pemdata := pem.EncodeToMemory(
-				&pem.Block{
-					Type:  "RSA PRIVATE KEY",
-					Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-				},
-			)
-			fmt.Println(string(pemdata))
-			return nil
+			return err
 		},
 	}
+}
+
+func generatePrivateKey() (string, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", err
+	}
+	pemdata := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		},
+	)
+	return string(pemdata), nil
 }
 
 func parsePrivateKey(content string) (*rsa.PrivateKey, error) {

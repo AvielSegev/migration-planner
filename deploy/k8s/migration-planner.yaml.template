@@ -53,7 +53,10 @@ spec:
               value: "@INSECURE_REGISTRY@"
             - name: PERSISTENT_DISK_DEVICE
               value: "@PERSISTENT_DISK_DEVICE@"
-          volumeMounts:
+            - name: MIGRATION_PLANNER_AUTH
+              value: "@MIGRATION_PLANNER_AUTH@"
+            - name: MIGRATION_PLANNER_PRIVATE_KEY
+              value: "@MIGRATION_PLANNER_PRIVATE_KEY@"
           volumeMounts:
             - name: migration-planner-config
               mountPath: "/.migration-planner/config.yaml"

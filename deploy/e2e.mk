@@ -69,3 +69,4 @@ persistent_disk:
 undeploy-e2e-environment:
 	kind delete cluster --name kind-e2e
 	$(PODMAN) rmi $(MIGRATION_PLANNER_AGENT_IMAGE)
+	rm ~/.config/planner/client.yaml

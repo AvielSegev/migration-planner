@@ -80,6 +80,10 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string) (*plann
 	return &plannerAgentLibvirt{c: c, name: name, con: conn, sourceID: sourceID}, nil
 }
 
+//func newUserAuth() {
+//
+//}
+
 func (p *plannerAgentLibvirt) Run() error {
 	if err := p.prepareImage(p.sourceID); err != nil {
 		return err

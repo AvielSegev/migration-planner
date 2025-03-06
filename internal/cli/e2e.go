@@ -18,6 +18,7 @@ type E2ETestOptions struct {
 	plannerAPIImage           string
 	plannerAPIImagePullPolicy string
 	plannerAuth               string
+	privateKey                string
 	containerRuntime          string
 	localRegistryPort         string
 	pkgManager                string
@@ -44,12 +45,14 @@ func DefaultE2EOptions() *E2ETestOptions {
 	defaultInsecureRegistry := fmt.Sprintf("%s:%s", defaultRegistryIP, defaultRegistryPort)
 	defaultPlannerAgentImage := fmt.Sprintf("%s/agent", defaultInsecureRegistry)
 	defaultNetworkInterface := getInterfaceName(defaultRegistryIP)
+	privateKeyStr, _ := generatePrivateKey()
 
 	return &E2ETestOptions{
 		clusterName:               defaultClusterName,
 		plannerAPIImage:           defaultPlannerAPIImage,
 		plannerAPIImagePullPolicy: defaultPullPolicy,
 		plannerAuth:               defaultPlannerAuth,
+		privateKey:                privateKeyStr,
 		containerRuntime:          defaultContainerRuntime,
 		localRegistryPort:         defaultRegistryPort,
 		insecureRegistryAddr:      defaultInsecureRegistry,
@@ -140,6 +143,7 @@ func (o *E2ETestOptions) configureEnvironment() error {
 		"PODMAN":                                  o.containerRuntime,
 		"PKG_MANAGER":                             o.pkgManager,
 		"IFACE":                                   o.iface,
+		"MIGRATION_PLANNER_PRIVATE_KEY":           o.privateKey,
 	}
 
 	for key, value := range envVars {

@@ -144,7 +144,9 @@ deploy-on-kind:
              s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
              s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
              s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
-             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
+             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g; \
+             s|@MIGRATION_PLANNER_AUTH@|$(MIGRATION_PLANNER_AUTH)|g; \
+             s|@MIGRATION_PLANNER_PRIVATE_KEY@|$(shell echo "$$MIGRATION_PLANNER_PRIVATE_KEY" | base64 -w 0 | base64 -d)|g" \
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
