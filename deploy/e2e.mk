@@ -1,5 +1,5 @@
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -30,6 +30,14 @@ setup_libvirt:
 		sudo dnf install -y sshpass libvirt-devel libvirt-daemon libvirt-daemon-config-network; \
 	fi
 	sudo systemctl restart libvirtd
+
+.PHONY: generate_private_key
+generate_private_key:
+	@if [ ! -f ~/.ssh/e2e-private-key ]; then \
+		make build && \
+		bin/planner sso private-key > ~/.ssh/e2e-private-key && \
+		chmod 600 ~/.ssh/e2e-private-key; \
+	fi
 
 .PHONY: deploy_registry
 deploy_registry:

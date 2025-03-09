@@ -27,13 +27,15 @@ const (
 )
 
 var (
-	home              string = os.Getenv("HOME")
-	defaultConfigPath string = filepath.Join(home, ".config/planner/client.yaml")
-	defaultBasePath   string = "/tmp/untarova/"
-	defaultIsoPath           = filepath.Join(defaultBasePath, "agent.iso")
-	defaultVmdkName          = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
-	defaultOvaPath    string = filepath.Join(home, "myimage.ova")
-	defaultServiceUrl string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
+	home                  string = os.Getenv("HOME")
+	defaultConfigPath     string = filepath.Join(home, ".config/planner/client.yaml")
+	defaultBasePath       string = "/tmp/untarova/"
+	defaultIsoPath               = filepath.Join(defaultBasePath, "agent.iso")
+	defaultVmdkName              = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
+	defaultOvaPath        string = filepath.Join(home, "myimage.ova")
+	defaultServiceUrl     string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
+	defaultPrivateKeyPath string = filepath.Join(home, ".ssh/e2e-private-key")
+	jwtToken              string = ""
 )
 
 type PlannerAgent interface {
@@ -110,6 +112,7 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
+		Token:        GetToken("admin", "admin"),
 	}
 	ctx := auth.NewUserContext(context.TODO(), user)
 
@@ -357,7 +360,9 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
+		Token:        GetToken("admin", "admin"),
 	}
+
 	ctx := auth.NewUserContext(context.TODO(), user)
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
@@ -377,6 +382,7 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
+		Token:        GetToken("admin", "admin"),
 	}
 	ctx := auth.NewUserContext(context.TODO(), user)
 
@@ -392,6 +398,7 @@ func (s *plannerService) RemoveSources() error {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
+		Token:        GetToken("admin", "admin"),
 	}
 	ctx := auth.NewUserContext(context.TODO(), user)
 
