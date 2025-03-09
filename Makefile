@@ -140,6 +140,16 @@ deploy-vsphere-simulator:
 	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
 
 deploy-on-kind:
+	awk '\
+	/@MIGRATION_PLANNER_PRIVATE_KEY@/ {\
+		system("sed \"s/^/          /\" $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key");\
+		next;\
+	}\
+	{\
+	gsub(/@MIGRATION_PLANNER_AUTH@/, "local");\
+	print;\
+	}' deploy/k8s/postgres-secret.yaml.template > deploy/k8s/postgres-secret.yaml\
+
 	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
              s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
              s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
@@ -161,6 +171,8 @@ deploy-on-openshift:
              s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
+	sed "s|@MIGRATION_PLANNER_AUTH@|"none"|g; \
+			s|@MIGRATION_PLANNER_PRIVATE_KEY@||g" deploy/k8s/postgres-secret.yaml.template > deploy/k8s/postgres-secret.yaml
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
 	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
