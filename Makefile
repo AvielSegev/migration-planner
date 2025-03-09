@@ -146,6 +146,8 @@ deploy-on-kind:
              s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
              s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
+	sed "s|@MIGRATION_PLANNER_AUTH@|"local"|g; \
+     s|@MIGRATION_PLANNER_PRIVATE_KEY@|$(shell cat ~/.ssh/e2e-private-key | base64 -w 0)|g" deploy/k8s/postgres-secret.yaml.template > deploy/k8s/postgres-secret.yaml
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
 	config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
@@ -161,6 +163,8 @@ deploy-on-openshift:
              s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
+	sed "s|@MIGRATION_PLANNER_AUTH@|"none"|g; \
+			s|@MIGRATION_PLANNER_PRIVATE_KEY@||g" deploy/k8s/postgres-secret.yaml.template > deploy/k8s/postgres-secret.yaml
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
 	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
