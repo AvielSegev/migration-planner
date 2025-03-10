@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"io"
 	"net/http"
 	"os"
@@ -112,13 +113,18 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
-		Token:        GetToken("admin", "admin"),
 	}
 	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx = NewContextWithJWT(ctx, GetToken(user.Username, user.Organization))
 
 	// Download OVA
 
-	res, err := p.c.GetImage(ctx, sourceID)
+	res, err := p.c.GetImage(ctx, sourceID, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("error getting source image: %w", err)
 	}
@@ -360,19 +366,28 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
-		Token:        GetToken("admin", "admin"),
 	}
 
 	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx = NewContextWithJWT(ctx, GetToken(user.Username, user.Organization))
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
-	res, err := s.c.CreateSourceWithResponse(ctx, params)
+	res, err := s.c.CreateSourceWithResponse(ctx, params, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
-		return nil, fmt.Errorf("Error creating the source: %s", err)
+		code := -1
+		if res != nil {
+			code = res.HTTPResponse.StatusCode
+		}
+		return nil, fmt.Errorf("error creating the source: %v. Response code: %d", err, code)
 	}
 
 	if res.JSON201 == nil {
-		return nil, fmt.Errorf("Error creating the source")
+		return nil, fmt.Errorf("error creating the source")
 	}
 
 	return res.JSON201, nil
@@ -382,11 +397,16 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
-		Token:        GetToken("admin", "admin"),
 	}
 	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx = NewContextWithJWT(ctx, GetToken(user.Username, user.Organization))
 
-	res, err := s.c.GetSourceWithResponse(ctx, id)
+	res, err := s.c.GetSourceWithResponse(ctx, id, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
 		return nil, fmt.Errorf("Error listing sources")
 	}
@@ -398,11 +418,16 @@ func (s *plannerService) RemoveSources() error {
 	user := auth.User{
 		Username:     "admin",
 		Organization: "admin",
-		Token:        GetToken("admin", "admin"),
 	}
 	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx = NewContextWithJWT(ctx, GetToken(user.Username, user.Organization))
 
-	_, err := s.c.DeleteSourcesWithResponse(ctx)
+	_, err := s.c.DeleteSourcesWithResponse(ctx, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
 	return err
 }
 
@@ -419,4 +444,16 @@ func createConfigFile(configPath string) error {
 	}
 
 	return nil
+}
+
+func jwtFromContext(ctx context.Context) (string, bool) {
+	val := ctx.Value(common.JwtKey)
+	if val == nil {
+		return "", false
+	}
+	return val.(string), true
+}
+
+func NewContextWithJWT(ctx context.Context, jwt string) context.Context {
+	return context.WithValue(ctx, common.JwtKey, jwt)
 }

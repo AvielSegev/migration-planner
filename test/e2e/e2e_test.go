@@ -25,6 +25,9 @@ var _ = Describe("e2e", func() {
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
+		//Expect(svc.GetSource(uuid.UUID{})).To(BeNil())
+		//Expect(GetToken("admin", "admin")).Should(BeNil())
+
 		// create the source
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())

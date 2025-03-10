@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"io"
 	"os"
 	"os/exec"
@@ -133,25 +132,25 @@ func RunCommand(ip string, command string) (string, error) {
 	return stdout.String(), nil
 }
 
-func GetToken(username string, organization string) *jwt.Token {
+func GetToken(username string, organization string) string {
 	if jwtToken == "" {
 		privateKeyString, err := os.ReadFile(defaultPrivateKeyPath)
 		if err != nil {
-			return nil
+			return jwtToken
 		}
 
 		privateKey, err := cli.ParsePrivateKey(string(privateKeyString))
 		if err != nil {
-			return nil
+			return jwtToken
 		}
 
 		token, err := cli.GenerateToken(username, organization, privateKey)
 		if err != nil {
-			return nil
+			return jwtToken
 		}
 
 		jwtToken = token
 	}
 
-	return &jwt.Token{Raw: jwtToken}
+	return jwtToken
 }
