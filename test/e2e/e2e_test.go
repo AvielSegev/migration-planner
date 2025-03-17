@@ -11,6 +11,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var testOptions = E2ETestOptions{
+	downloadImageByUrl: false,
+}
+
 var _ = Describe("e2e", func() {
 
 	var (
@@ -22,6 +26,7 @@ var _ = Describe("e2e", func() {
 		source   *v1alpha1.Source
 	)
 
+	// Create a source in the DB using the API
 	createSource := func(name string) *v1alpha1.Source {
 		source, err := svc.CreateSource(name)
 		Expect(err).To(BeNil())
@@ -29,6 +34,7 @@ var _ = Describe("e2e", func() {
 		return source
 	}
 
+	// Create VM with the UUID of the source created
 	createAgent := func(configPath string, idForTest string, uuid uuid.UUID, vmName string) PlannerAgent {
 		agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
 		Expect(err).To(BeNil(), "Failed to create PlannerAgent")
@@ -48,12 +54,14 @@ var _ = Describe("e2e", func() {
 		return agent
 	}
 
+	// Login to VSphere and put the credentials
 	loginToVsphere := func(username string, password string, expectedStatusCode int) {
 		res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), username, password)
 		Expect(err).To(BeNil())
 		Expect(res.StatusCode).To(Equal(expectedStatusCode))
 	}
 
+	// check that source is up to date eventually
 	WaitForAgentToBeUpToDate := func(uuid uuid.UUID) {
 		Eventually(func() bool {
 			source, err := svc.GetSource(uuid)
@@ -64,6 +72,7 @@ var _ = Describe("e2e", func() {
 		}, "3m").Should(BeTrue())
 	}
 
+	// Wait for the service to return correct credential url for a source by UUID
 	waitForValidCredentialURL := func(uuid uuid.UUID, agentIP string) {
 		Eventually(func() string {
 			s, err := svc.GetSource(uuid)
@@ -128,16 +137,9 @@ var _ = Describe("e2e", func() {
 
 	Context("Flow", func() {
 		It("Up to date", func() {
-			// Put the vCenter credentials and check that source is up to date eventually
 			loginToVsphere("core", "123456", http.StatusNoContent)
 
-			Eventually(func() bool {
-				source, err := svc.GetSource(source.Id)
-				if err != nil {
-					return false
-				}
-				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-			}, "1m", "2s").Should(BeTrue())
+			WaitForAgentToBeUpToDate(source.Id)
 		})
 
 		It("Source removal", func() {
@@ -173,6 +175,16 @@ var _ = Describe("e2e", func() {
 			WaitForAgentToBeUpToDate(source2.Id)
 
 			_ = agent2.Remove()
+		})
+
+		It("Downloads OVA file from URL", func() {
+			testOptions.downloadImageByUrl = true
+
+			loginToVsphere("core", "123456", http.StatusNoContent)
+
+			WaitForAgentToBeUpToDate(source.Id)
+
+			testOptions.downloadImageByUrl = false
 		})
 	})
 

@@ -128,3 +128,7 @@ func RunCommand(ip string, command string) (string, error) {
 
 	return stdout.String(), nil
 }
+
+type E2ETestOptions struct {
+	downloadImageByUrl bool
+}
