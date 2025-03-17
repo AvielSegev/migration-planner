@@ -11,6 +11,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var testOptions = E2ETestOptions{
+	downloadImageByUrl: false,
+}
+
 var _ = Describe("e2e", func() {
 
 	var (
@@ -128,16 +132,9 @@ var _ = Describe("e2e", func() {
 
 	Context("Flow", func() {
 		It("Up to date", func() {
-			// Put the vCenter credentials and check that source is up to date eventually
 			loginToVsphere("core", "123456", http.StatusNoContent)
 
-			Eventually(func() bool {
-				source, err := svc.GetSource(source.Id)
-				if err != nil {
-					return false
-				}
-				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-			}, "1m", "2s").Should(BeTrue())
+			WaitForAgentToBeUpToDate(source.Id)
 		})
 
 		It("Source removal", func() {
@@ -173,6 +170,16 @@ var _ = Describe("e2e", func() {
 			WaitForAgentToBeUpToDate(source2.Id)
 
 			_ = agent2.Remove()
+		})
+
+		It("Downloads OVA file from URL", func() {
+			testOptions.downloadImageByUrl = true
+
+			loginToVsphere("core", "123456", http.StatusNoContent)
+
+			WaitForAgentToBeUpToDate(source.Id)
+
+			testOptions.downloadImageByUrl = false
 		})
 	})
 

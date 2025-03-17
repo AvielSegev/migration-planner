@@ -83,7 +83,7 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTe
 }
 
 func (p *plannerAgentLibvirt) Run() error {
-	if err := p.prepareImage(p.sourceID); err != nil {
+	if err := p.prepareImage(); err != nil {
 		return err
 	}
 
@@ -95,7 +95,7 @@ func (p *plannerAgentLibvirt) Run() error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
+func (p *plannerAgentLibvirt) prepareImage() error {
 	// Create OVA:
 	ovaFile, err := os.Create(defaultOvaPath)
 	if err != nil {
@@ -113,31 +113,90 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 		Username:     "admin",
 		Organization: "admin",
 	}
+
 	ctx := auth.NewTokenContext(context.TODO(), user)
+	var res *http.Response
 
-	// Download OVA
+	if testOptions.downloadImageByUrl {
+		var url string
+		url, err = p.getDownloadURL(ctx)
+		if err != nil {
+			return err
+		}
 
-	res, err := p.c.GetImage(ctx, sourceID)
+		res, err = http.Get(url)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+
+		if _, err = io.Copy(ovaFile, res.Body); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
+		}
+
+	} else {
+
+		// Download OVA
+		res, err = p.c.GetImage(ctx, p.sourceID)
+		if err != nil {
+			return fmt.Errorf("error getting source image: %w", err)
+		}
+		defer res.Body.Close()
+
+		if _, err = io.Copy(ovaFile, res.Body); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
+		}
+	}
+
+	err = p.ovaValidateAndExtract(ovaFile)
 	if err != nil {
-		return fmt.Errorf("error getting source image: %w", err)
+		return err
+	}
+
+	return nil
+}
+
+type getDownloadURLResponse struct {
+	ExpiresAt string `json:"expires_at"`
+	URL       string `json:"url"`
+}
+
+func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error) {
+	res, err := p.c.GetSourceDownloadURL(ctx, p.sourceID)
+	if err != nil {
+		return "", fmt.Errorf("error getting source url: %w", err)
 	}
 	defer res.Body.Close()
 
-	if _, err = io.Copy(ovaFile, res.Body); err != nil {
-		return fmt.Errorf("error writing to file: %w", err)
+	var result getDownloadURLResponse
+
+	var body []byte
+	body, err = io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body: %w", err)
 	}
 
-	if err = ValidateTar(ovaFile); err != nil {
+	// Parse JSON response
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return "", fmt.Errorf("error decoding JSON: %w", err)
+	}
+
+	return result.URL, nil
+}
+
+func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
+	if err := ValidateTar(ovaFile); err != nil {
 		return fmt.Errorf("error validating tar: %w", err)
 	}
 
 	// Untar ISO from OVA
-	if err = Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
+	if err := Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
 	// Untar VMDK from OVA
-	if err = Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
+	if err := Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
