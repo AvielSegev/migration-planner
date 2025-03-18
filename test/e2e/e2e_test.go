@@ -205,6 +205,9 @@ var _ = Describe("e2e", func() {
 		//})
 
 		It("Disconnected environment", func() {
+			err = agent.DisableServiceConnection(agentIP)
+			Expect(err).To(BeNil())
+
 			loginToVsphere("core", "123456", http.StatusNoContent)
 
 			statusReply, err := agent.getAgentStatus()

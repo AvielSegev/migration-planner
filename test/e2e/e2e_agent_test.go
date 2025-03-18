@@ -48,6 +48,7 @@ type PlannerAgent interface {
 	getAgentStatus() (*agent.StatusReply, error)
 	IsServiceRunning(string, string) bool
 	DumpLogs(string)
+	DisableServiceConnection(string) error
 }
 
 type PlannerService interface {
@@ -424,6 +425,26 @@ func (p *plannerAgentLibvirt) GetIp() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("No IP found")
+}
+
+func (p *plannerAgentLibvirt) DisableServiceConnection(agentIP string) error {
+
+	command := "sudo firewall-cmd --add-rich-rule='rule family=\"ipv4\" destination address=\"" +
+		fmt.Sprintf("%s\" port port=\"%s\" protocol=\"tcp\" reject' --permanent", agentIP, "3443")
+
+	_, err := RunCommand(agentIP, command)
+	if err != nil {
+		return err
+	}
+
+	command = "sudo firewall-cmd --reload"
+
+	_, err = RunCommand(agentIP, command)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *plannerAgentLibvirt) IsServiceRunning(agentIp string, service string) bool {
