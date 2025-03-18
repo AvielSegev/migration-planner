@@ -20,6 +20,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
+
+	"github.com/kubev2v/migration-planner/internal/agent"
 )
 
 const (
@@ -43,6 +45,7 @@ type PlannerAgent interface {
 	Restart() error
 	Remove() error
 	GetIp() (string, error)
+	getAgentStatus() (*agent.StatusReply, error)
 	IsServiceRunning(string, string) bool
 	DumpLogs(string)
 }
@@ -271,6 +274,45 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http
 
 func (p *plannerAgentLibvirt) RestartService() error {
 	return nil
+}
+
+func (p *plannerAgentLibvirt) getAgentStatus() (*agent.StatusReply, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Skip SSL verification
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: tr,
+	}
+
+	agentIP, err := p.GetIp()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent IP: %w", err)
+	}
+
+	url := fmt.Sprintf("https://%s:3333/api/v1/status", agentIP)
+
+	res, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error getting agent status from local server: %v", err)
+	}
+	defer res.Body.Close()
+	result := agent.StatusReply{}
+
+	var body []byte
+	body, err = io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding JSON: %w", err)
+	}
+
+	return &result, nil
 }
 
 func (p *plannerAgentLibvirt) Restart() error {
