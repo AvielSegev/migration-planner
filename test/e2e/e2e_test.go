@@ -31,6 +31,10 @@ var _ = Describe("e2e", func() {
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
+		err := getToken(defaultUsername, defaultOrganization)
+		Expect(err).To(BeNil())
+		Expect(jwtToken).NotTo(BeEmpty())
+
 		source = CreateSource("source")
 
 		agent, agentIP = CreateAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
@@ -143,6 +147,10 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
+
+		err := getToken(defaultUsername, defaultOrganization)
+		Expect(err).To(BeNil())
+		Expect(jwtToken).NotTo(BeEmpty())
 
 		source = CreateSource("source")
 

@@ -14,6 +14,7 @@ MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 MIGRATION_PLANNER_UI_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
+MIGRATION_PLANNER_AUTH ?= local
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
 REGISTRY_TAG ?= latest
@@ -208,6 +209,7 @@ delete-from-openshift: oc
 	echo "*** Migration Planner has been deleted successfully from Openshift ***"
 
 deploy-on-kind: oc
+	$(KUBECTL) create secret generic migration-planner-private-key-secret --from-file=private-key=$(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key
 	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
 		echo "*** Deploy Migration Planner on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
 	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
@@ -221,6 +223,7 @@ deploy-on-kind: oc
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
+	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
 	   | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** Migration Planner has been deployed successfully on Kind ***"
 
