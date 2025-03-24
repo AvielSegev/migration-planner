@@ -35,17 +35,17 @@ func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName str
 			return ""
 		}
 		return agentIP
-	}, "3m").ShouldNot(BeEmpty())
+	}, "4m").ShouldNot(BeEmpty())
 	Expect(agentIP).ToNot(BeEmpty())
 	Eventually(func() bool {
 		return agent.IsServiceRunning(agentIP, "planner-agent")
-	}, "3m").Should(BeTrue())
+	}, "4m").Should(BeTrue())
 	return agent, agentIP
 }
 
 // Login to VSphere and put the credentials
-func LoginToVsphere(username string, password string, expectedStatusCode int) {
-	res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), username, password)
+func LoginToVsphere(agent PlannerAgent, address string, port string, username string, password string, expectedStatusCode int) {
+	res, err := agent.Login(fmt.Sprintf("https://%s:%s/sdk", address, port), username, password)
 	Expect(err).To(BeNil())
 	Expect(res.StatusCode).To(Equal(expectedStatusCode))
 }
@@ -58,7 +58,7 @@ func WaitForAgentToBeUpToDate(uuid uuid.UUID) {
 			return false
 		}
 		return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-	}, "3m").Should(BeTrue())
+	}, "6m").Should(BeTrue())
 }
 
 // Wait for the service to return correct credential url for a source by UUID
@@ -76,7 +76,7 @@ func WaitForValidCredentialURL(uuid uuid.UUID, agentIP string) {
 		}
 
 		return ""
-	}, "3m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
+	}, "4m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 }
 
 func ValidateTar(file *os.File) error {
@@ -184,7 +184,7 @@ func (p *plannerAgentLibvirt) CreateVm() error {
 	return nil
 }
 
-func RunCommand(ip string, command string) (string, error) {
+func RunSSHCommand(ip string, command string) (string, error) {
 	sshCmd := exec.Command("sshpass", "-p", "123456", "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", fmt.Sprintf("core@%s", ip), command)
 
 	var stdout, stderr bytes.Buffer
@@ -193,6 +193,20 @@ func RunCommand(ip string, command string) (string, error) {
 
 	if err := sshCmd.Run(); err != nil {
 		return stderr.String(), fmt.Errorf("command failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
+func RunLocalCommand(command string) (string, error) {
+	cmd := exec.Command("bash", "-c", command)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("command failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
 	}
 
 	return stdout.String(), nil
@@ -215,4 +229,44 @@ func getToken(username string, organization string) (string, error) {
 	}
 
 	return token, nil
+}
+
+func DisableServiceConnection() error {
+	ports := []string{"7443", "3443"}
+
+	for _, port := range ports {
+		output, err := RunLocalCommand(fmt.Sprintf("lsof -ti :%s", port))
+		if err != nil {
+			if strings.Contains(err.Error(), "command failed") {
+				continue // No process found for this port
+			}
+			return fmt.Errorf("failed to find process for port %s: %v", port, err)
+		}
+
+		pids := strings.Fields(output)
+		for _, pid := range pids {
+			_, err := RunLocalCommand("kill " + pid)
+			if err != nil {
+				return fmt.Errorf("failed to kill process %s for port %s: %v", pid, port, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func EnableServiceConnection() error {
+	commands := []string{
+		"kubectl port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &",
+		"kubectl port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &",
+	}
+
+	for _, cmd := range commands {
+		_, err := RunLocalCommand(cmd)
+		if err != nil {
+			return fmt.Errorf("failed to enable service connection: %v", err)
+		}
+	}
+
+	return nil
 }
