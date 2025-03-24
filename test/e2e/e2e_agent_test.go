@@ -21,6 +21,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
+
+	coreAgent "github.com/kubev2v/migration-planner/internal/agent"
 )
 
 const (
@@ -48,6 +50,8 @@ type PlannerAgent interface {
 	Restart() error
 	Remove() error
 	GetIp() (string, error)
+	Status() (*coreAgent.StatusReply, error)
+	Inventory() (*v1alpha1.Inventory, error)
 	IsServiceRunning(string, string) bool
 	DumpLogs(string)
 }
@@ -57,6 +61,7 @@ type PlannerService interface {
 	RemoveSource(id uuid.UUID) error
 	GetSource(id uuid.UUID) (*api.Source, error)
 	CreateSource(name string) (*api.Source, error)
+	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
 }
 
 type plannerService struct {
@@ -90,6 +95,12 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTe
 func (p *plannerAgentLibvirt) Run() error {
 	if err := p.prepareImage(); err != nil {
 		return err
+	}
+
+	if testOptions.disconnectedEnvironment {
+		if err := DisableServiceConnection(); err != nil { // hack for changing the config.yaml to point bad service address
+			return err
+		}
 	}
 
 	err := p.CreateVm()
@@ -271,6 +282,76 @@ func (p *plannerAgentLibvirt) RestartService() error {
 	return nil
 }
 
+func (p *plannerAgentLibvirt) Status() (*coreAgent.StatusReply, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: tr,
+	}
+
+	agentIP, _ := p.GetIp()
+	url := fmt.Sprintf("https://%s:3333/api/v1/status", agentIP)
+
+	res, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error getting agent status from local server: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	result := coreAgent.StatusReply{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	return &result, nil
+}
+
+func (p *plannerAgentLibvirt) Inventory() (*v1alpha1.Inventory, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: tr,
+	}
+
+	agentIP, _ := p.GetIp()
+	url := fmt.Sprintf("https://%s:3333/api/v1/inventory", agentIP)
+
+	res, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error getting agent inventory from local server: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var result struct {
+		Uuid      string             `json:"agentId"`
+		Inventory v1alpha1.Inventory `json:"inventory"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	return &result.Inventory, nil
+}
+
 func (p *plannerAgentLibvirt) Restart() error {
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
@@ -444,6 +525,20 @@ func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
 	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
 
 	_, err := s.c.DeleteSourceWithResponse(ctx, uuid, attachJWT)
+	return err
+}
+
+func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
+	// TODO complete this function to work and check it in the test
+	update := v1alpha1.UpdateSourceJSONRequestBody{
+		AgentId:   uuid,
+		Inventory: *inventory,
+	}
+
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
+
+	_, err := s.c.UpdateSourceWithResponse(ctx, uuid, update, attachJWT)
 	return err
 }
 
