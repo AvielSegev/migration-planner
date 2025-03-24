@@ -1,7 +1,7 @@
 E2E_PRIVATE_KEY_FOLDER_PATH ?= /etc/planner/e2e
 
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt install_coreos_installer generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -32,6 +32,27 @@ setup_libvirt:
 		sudo dnf install -y sshpass libvirt-devel libvirt-daemon libvirt-daemon-config-network; \
 	fi
 	sudo systemctl restart libvirtd
+
+.PHONY: install_coreos_installer
+install_coreos_installer:
+	@if ! command -v coreos-installer >/dev/null 2>&1; then \
+    	if [ "$(PKG_MANAGER)" = "apt" ]; then \
+    		curl -L -O https://github.com/coreos/coreos-installer/archive/refs/tags/v0.23.0.tar.gz && \
+    		tar -xvzf v0.23.0.tar.gz && \
+    		cd coreos-installer-0.23.0 && \
+    		sudo apt update && \
+    		sudo apt install -y cargo libzstd-dev libssl-dev pkg-config && \
+    		make RELEASE=1 PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig OPENSSL_DIR=/usr \
+    			OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu OPENSSL_INCLUDE_DIR=/usr/include OPENSSL_STATIC=1 && \
+    		sudo cp target/release/coreos-installer /usr/local/bin/coreos-installer && \
+    		cd .. && \
+    		rm -rf coreos-installer-0.23.0 v0.23.0.tar.gz; \
+    	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
+    		sudo dnf install -y coreos-installer; \
+    	fi \
+    else \
+    	echo "coreos-installer is already installed"; \
+    fi
 
 .PHONY: generate_private_key
 generate_private_key:

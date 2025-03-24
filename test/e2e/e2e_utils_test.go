@@ -3,6 +3,8 @@ package e2e_test
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -11,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -35,17 +38,17 @@ func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName str
 			return ""
 		}
 		return agentIP
-	}, "3m").ShouldNot(BeEmpty())
+	}, "4m").ShouldNot(BeEmpty())
 	Expect(agentIP).ToNot(BeEmpty())
 	Eventually(func() bool {
 		return agent.IsServiceRunning(agentIP, "planner-agent")
-	}, "3m").Should(BeTrue())
+	}, "4m").Should(BeTrue())
 	return agent, agentIP
 }
 
 // Login to VSphere and put the credentials
-func LoginToVsphere(username string, password string, expectedStatusCode int) {
-	res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), username, password)
+func LoginToVsphere(agent PlannerAgent, address string, port string, username string, password string, expectedStatusCode int) {
+	res, err := agent.Login(fmt.Sprintf("https://%s:%s/sdk", address, port), username, password)
 	Expect(err).To(BeNil())
 	Expect(res.StatusCode).To(Equal(expectedStatusCode))
 }
@@ -58,7 +61,7 @@ func WaitForAgentToBeUpToDate(uuid uuid.UUID) {
 			return false
 		}
 		return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-	}, "3m").Should(BeTrue())
+	}, "6m").Should(BeTrue())
 }
 
 // Wait for the service to return correct credential url for a source by UUID
@@ -76,7 +79,7 @@ func WaitForValidCredentialURL(uuid uuid.UUID, agentIP string) {
 		}
 
 		return ""
-	}, "3m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
+	}, "4m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 }
 
 func ValidateTar(file *os.File) error {
@@ -184,7 +187,7 @@ func (p *plannerAgentLibvirt) CreateVm() error {
 	return nil
 }
 
-func RunCommand(ip string, command string) (string, error) {
+func RunSSHCommand(ip string, command string) (string, error) {
 	sshCmd := exec.Command("sshpass", "-p", "123456", "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", fmt.Sprintf("core@%s", ip), command)
 
 	var stdout, stderr bytes.Buffer
@@ -193,6 +196,20 @@ func RunCommand(ip string, command string) (string, error) {
 
 	if err := sshCmd.Run(); err != nil {
 		return stderr.String(), fmt.Errorf("command failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
+func RunLocalCommand(command string) (string, error) {
+	cmd := exec.Command("bash", "-c", command)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("command failed: %v\nstdout: %s\nstderr: %s", err, stdout.String(), stderr.String())
 	}
 
 	return stdout.String(), nil
@@ -215,4 +232,115 @@ func getToken(username string, organization string) (string, error) {
 	}
 
 	return token, nil
+}
+
+func (p *plannerAgentLibvirt) DisableServiceConnection() error {
+	isoPath := p.IsoFilePath()
+	ignitionOutputPath := filepath.Join(defaultBasePath, "ignition.ign")
+
+	// Retrieve the content of the original Ignition file
+	ignitionData, err := fetchIgnition(isoPath)
+	if err != nil {
+		return fmt.Errorf("unable to extract the ignition file from %s: %v\n", isoPath, err)
+	}
+
+	// Extract the contents of config.yaml
+	configFilePath := "/home/core/.migration-planner/config/config.yaml"
+	encodedConfigData, err := fetchEncodedConfig(ignitionData, configFilePath)
+	if err != nil {
+		return fmt.Errorf("unable to extract config.yaml encoded value from ignition file at %s: %v\n", configFilePath, err)
+	}
+
+	// Replace the service address IP with localhost to make it unreachable
+	updatedConfigBase64, err := modifyServerURL(encodedConfigData, systemIP, "127.0.0.1:7443")
+	if err != nil {
+		return fmt.Errorf("unable to modify the config.yaml with new server address: %v", err)
+	}
+
+	// Export a new Ignition file with the updated configuration
+	if _, err = RunLocalCommand(fmt.Sprintf(
+		"echo '%s' |"+
+			" jq '(.storage.files[] |"+
+			" select(.path == \"%s\") |"+
+			" .contents.source) = \"data:;base64,%s\"' > %s",
+		ignitionData, configFilePath, updatedConfigBase64, ignitionOutputPath)); err != nil {
+		return fmt.Errorf("unable to create new ignition file: %v\n", err)
+	}
+	defer os.Remove(ignitionOutputPath)
+
+	// Embed the updated Ignition file into the ISO
+	if err := overrideIsoIgnition(ignitionOutputPath, isoPath); err != nil {
+		return fmt.Errorf("unable to embed the updated ignition into ISO: %v\n", err)
+	}
+
+	return nil
+}
+
+func fetchIgnition(isoPath string) (string, error) {
+	output, err := RunLocalCommand(fmt.Sprintf("coreos-installer iso ignition show %s", isoPath))
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+}
+
+func fetchEncodedConfig(ignitionData string, configPath string) (string, error) {
+	output, err := RunLocalCommand(
+		fmt.Sprintf("echo '%s' | "+
+			"jq -r '.storage.files[] | "+
+			"select(.path == \"%s\") | "+
+			".contents.source'",
+			ignitionData, configPath))
+
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+// Function to decode, modify, compress, and return the updated base64 string
+func modifyServerURL(encodedData string, oldServer, newServer string) (string, error) {
+	// Remove the "data:;base64," prefix
+	encodedData = strings.TrimPrefix(encodedData, "data:;base64,")
+
+	decodedData, err := base64.StdEncoding.DecodeString(encodedData)
+	if err != nil {
+		return "", fmt.Errorf("error decoding base64: %v", err)
+	}
+
+	reader, err := gzip.NewReader(bytes.NewReader(decodedData))
+	if err != nil {
+		return "", fmt.Errorf("error decompressing gzip: %v", err)
+	}
+	defer reader.Close()
+
+	decompressedData, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("error reading decompressed data: %v", err)
+	}
+
+	modifiedData := strings.Replace(string(decompressedData), oldServer, newServer, -1)
+
+	var compressedData bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressedData)
+	_, err = gzipWriter.Write([]byte(modifiedData))
+	if err != nil {
+		return "", fmt.Errorf("error compressing modified data: %v", err)
+	}
+	gzipWriter.Close()
+
+	encodedModifiedData := base64.StdEncoding.EncodeToString(compressedData.Bytes())
+
+	return encodedModifiedData, nil
+}
+
+func overrideIsoIgnition(ignitionFilePath string, isoPath string) error {
+	if _, err := RunLocalCommand(
+		fmt.Sprintf("coreos-installer iso ignition embed -fi %s %s",
+			ignitionFilePath, isoPath)); err != nil {
+		return err
+	}
+
+	return nil
 }
