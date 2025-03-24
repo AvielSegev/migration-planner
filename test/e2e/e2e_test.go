@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,13 +21,15 @@ var (
 )
 
 var testOptions = struct {
-	downloadImageByUrl bool
+	downloadImageByUrl      bool
+	disconnectedEnvironment bool
 }{}
 
 var _ = Describe("e2e", func() {
 
 	BeforeEach(func() {
 		testOptions.downloadImageByUrl = false
+		testOptions.disconnectedEnvironment = false
 
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -144,6 +147,7 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 
 	BeforeEach(func() {
 		testOptions.downloadImageByUrl = true
+		testOptions.disconnectedEnvironment = false
 
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -177,6 +181,56 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 			LoginToVsphere("core", "123456", http.StatusNoContent)
 
 			WaitForAgentToBeUpToDate(source.Id)
+		})
+	})
+})
+
+var _ = Describe("disconnected-environment", func() {
+
+	BeforeEach(func() {
+		testOptions.downloadImageByUrl = false
+		testOptions.disconnectedEnvironment = true
+
+		svc, err = NewPlannerService(defaultConfigPath)
+		Expect(err).To(BeNil(), "Failed to create PlannerService")
+
+		err := getToken(defaultUsername, defaultOrganization)
+		Expect(err).To(BeNil())
+		Expect(jwtToken).NotTo(BeEmpty())
+
+		source = CreateSource("source")
+
+		agent, agentIP = CreateAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
+
+		Expect(agent.IsServiceRunning(agentIP, "planner-agent")).To(BeTrue())
+
+		time.Sleep(90 * time.Second)
+	})
+
+	AfterEach(func() {
+		err = svc.RemoveSources()
+		Expect(err).To(BeNil(), "Failed to remove sources from DB")
+		err = agent.Remove()
+		Expect(err).To(BeNil(), "Failed to remove vm and iso")
+	})
+
+	AfterFailed(func() {
+		agent.DumpLogs(agentIP)
+	})
+
+	Context("Flow", func() {
+		It("Downloads OVA file from URL", func() {
+			LoginToVsphere("core", "123456", http.StatusNoContent)
+
+			statusReply, err := agent.Status()
+			Expect(err).To(BeNil(), "Failed to get agent status")
+			Expect(statusReply.Connected).Should(Equal("false"))
+
+			inventory, err := agent.Inventory()
+			Expect(err).To(BeNil())
+
+			err = svc.UpdateSource(source.Id, inventory)
+			Expect(err).To(BeNil())
 		})
 	})
 })
