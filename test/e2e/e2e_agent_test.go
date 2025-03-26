@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"io"
 	"net/http"
 	"os"
@@ -20,20 +21,26 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
+
+	coreAgent "github.com/kubev2v/migration-planner/internal/agent"
 )
 
 const (
-	vmName string = "coreos-vm"
+	vmName              string = "coreos-vm"
+	defaultUsername     string = "admin"
+	defaultOrganization string = "admin"
 )
 
 var (
-	home               string = os.Getenv("HOME")
-	defaultConfigPath  string = filepath.Join(home, ".config/planner/client.yaml")
-	defaultBasePath    string = "/tmp/untarova/"
-	defaultVmdkName           = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
-	defaultOvaPath     string = filepath.Join(home, "myimage.ova")
-	defaultServiceUrl  string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
-	defaultAgentTestID string = "1"
+	home                  string = os.Getenv("HOME")
+	defaultConfigPath     string = filepath.Join(home, ".config/planner/client.yaml")
+	defaultBasePath       string = "/tmp/untarova/"
+	defaultVmdkName              = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
+	defaultOvaPath        string = filepath.Join(home, "myimage.ova")
+	defaultServiceUrl     string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
+	defaultAgentTestID    string = "1"
+	defaultPrivateKeyPath string = filepath.Join("/etc/planner/e2e/private-key")
+	jwtToken              string = ""
 )
 
 type PlannerAgent interface {
@@ -43,6 +50,8 @@ type PlannerAgent interface {
 	Restart() error
 	Remove() error
 	GetIp() (string, error)
+	Status() (*coreAgent.StatusReply, error)
+	Inventory() (*v1alpha1.Inventory, error)
 	IsServiceRunning(string, string) bool
 	DumpLogs(string)
 }
@@ -52,6 +61,7 @@ type PlannerService interface {
 	RemoveSource(id uuid.UUID) error
 	GetSource(id uuid.UUID) (*api.Source, error)
 	CreateSource(name string) (*api.Source, error)
+	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
 }
 
 type plannerService struct {
@@ -83,8 +93,14 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTe
 }
 
 func (p *plannerAgentLibvirt) Run() error {
-	if err := p.prepareImage(p.sourceID); err != nil {
+	if err := p.prepareImage(); err != nil {
 		return err
+	}
+
+	if testOptions.disconnectedEnvironment {
+		if err := DisableServiceConnection(); err != nil { // hack for changing the config.yaml to point bad service address
+			return err
+		}
 	}
 
 	err := p.CreateVm()
@@ -95,7 +111,7 @@ func (p *plannerAgentLibvirt) Run() error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
+func (p *plannerAgentLibvirt) prepareImage() error {
 	// Create OVA:
 	ovaFile, err := os.Create(defaultOvaPath)
 	if err != nil {
@@ -109,35 +125,76 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 		}
 	}
 
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
-	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
+	var res *http.Response
 
-	// Download OVA
+	if testOptions.downloadImageByUrl {
+		url, err := p.getDownloadURL(ctx)
+		if err != nil {
+			return err
+		}
 
-	res, err := p.c.GetImage(ctx, sourceID)
-	if err != nil {
-		return fmt.Errorf("error getting source image: %w", err)
+		res, err = http.Get(url) // Download OVA from the extracted URL
+		if err != nil {
+			return err
+		}
+	} else {
+		res, err = p.c.GetImage(ctx, p.sourceID, attachJWT) // Stream the OVA directly to res
+		if err != nil {
+			return fmt.Errorf("error getting source image: %w", err)
+		}
 	}
+
 	defer res.Body.Close()
 
 	if _, err = io.Copy(ovaFile, res.Body); err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
 	}
 
-	if err = ValidateTar(ovaFile); err != nil {
+	if err := p.ovaValidateAndExtract(ovaFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error) {
+	res, err := p.c.GetSourceDownloadURL(ctx, p.sourceID, attachJWT)
+	if err != nil {
+		return "", fmt.Errorf("error getting source url: %w", err)
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		ExpiresAt string `json:"expires_at"`
+		URL       string `json:"url"`
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("error decoding JSON: %w", err)
+	}
+
+	return result.URL, nil
+}
+
+func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
+	if err := ValidateTar(ovaFile); err != nil {
 		return fmt.Errorf("error validating tar: %w", err)
 	}
 
 	// Untar ISO from OVA
-	if err = Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
+	if err := Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
 	// Untar VMDK from OVA
-	if err = Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
+	if err := Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
@@ -225,6 +282,76 @@ func (p *plannerAgentLibvirt) RestartService() error {
 	return nil
 }
 
+func (p *plannerAgentLibvirt) Status() (*coreAgent.StatusReply, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: tr,
+	}
+
+	agentIP, _ := p.GetIp()
+	url := fmt.Sprintf("https://%s:3333/api/v1/status", agentIP)
+
+	res, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error getting agent status from local server: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	result := coreAgent.StatusReply{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	return &result, nil
+}
+
+func (p *plannerAgentLibvirt) Inventory() (*v1alpha1.Inventory, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: tr,
+	}
+
+	agentIP, _ := p.GetIp()
+	url := fmt.Sprintf("https://%s:3333/api/v1/inventory", agentIP)
+
+	res, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("error getting agent inventory from local server: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var result struct {
+		Uuid      string             `json:"agentId"`
+		Inventory v1alpha1.Inventory `json:"inventory"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	return &result.Inventory, nil
+}
+
 func (p *plannerAgentLibvirt) Restart() error {
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
@@ -284,7 +411,7 @@ func (p *plannerAgentLibvirt) Remove() error {
 	defer p.con.Close()
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to find domain: %v", err)
 	}
 	defer func() {
 		_ = domain.Free()
@@ -292,12 +419,12 @@ func (p *plannerAgentLibvirt) Remove() error {
 
 	if state, _, err := domain.GetState(); err == nil && state == libvirt.DOMAIN_RUNNING {
 		if err := domain.Destroy(); err != nil {
-			return err
+			return fmt.Errorf("unable to destroy domain: %v", err)
 		}
 	}
 
 	if err := domain.Undefine(); err != nil {
-		return err
+		return fmt.Errorf("unable to undefine domain: %v", err)
 	}
 
 	// Remove the ISO file if it exists
@@ -357,14 +484,11 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 }
 
 func (s *plannerService) CreateSource(name string) (*api.Source, error) {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
-	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
-	res, err := s.c.CreateSourceWithResponse(ctx, params)
+	res, err := s.c.CreateSourceWithResponse(ctx, params, attachJWT)
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
 		return nil, fmt.Errorf("error creating the source: %v", err)
 	}
@@ -377,13 +501,10 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 }
 
 func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
-	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
 
-	res, err := s.c.GetSourceWithResponse(ctx, id)
+	res, err := s.c.GetSourceWithResponse(ctx, id, attachJWT)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
 		return nil, fmt.Errorf("error listing sources. response status code: %d", res.HTTPResponse.StatusCode)
 	}
@@ -392,24 +513,32 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 }
 
 func (s *plannerService) RemoveSources() error {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
-	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
 
-	_, err := s.c.DeleteSourcesWithResponse(ctx)
+	_, err := s.c.DeleteSourcesWithResponse(ctx, attachJWT)
 	return err
 }
 
 func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
-	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
 
-	_, err := s.c.DeleteSourceWithResponse(ctx, uuid)
+	_, err := s.c.DeleteSourceWithResponse(ctx, uuid, attachJWT)
+	return err
+}
+
+func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
+	// TODO complete this function to work and check it in the test
+	update := v1alpha1.UpdateSourceJSONRequestBody{
+		AgentId:   uuid,
+		Inventory: *inventory,
+	}
+
+	user := defaultUserAuth()
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), jwtToken)
+
+	_, err := s.c.UpdateSourceWithResponse(ctx, uuid, update, attachJWT)
 	return err
 }
 
@@ -441,4 +570,30 @@ func (p *plannerAgentLibvirt) getIsoPath() string {
 	}
 	fileName := fmt.Sprintf("agent-%s.iso", p.agentEndToEndTestID)
 	return filepath.Join(defaultBasePath, fileName)
+}
+
+func defaultUserAuth() auth.User {
+	return auth.User{
+		Username:     defaultUsername,
+		Organization: defaultOrganization,
+	}
+}
+
+func attachJWT(ctx context.Context, req *http.Request) error {
+	if jwt, found := jwtFromContext(ctx); found {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	}
+	return nil
+}
+
+func jwtFromContext(ctx context.Context) (string, bool) {
+	val := ctx.Value(common.JwtKey)
+	if val == nil {
+		return "", false
+	}
+	return val.(string), true
+}
+
+func contextWithJWT(ctx context.Context, jwt string) context.Context {
+	return context.WithValue(ctx, common.JwtKey, jwt)
 }

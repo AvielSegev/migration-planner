@@ -1,5 +1,7 @@
+E2E_PRIVATE_KEY_FOLDER_PATH ?= /etc/planner/e2e
+
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt install_coreos_installer generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -30,6 +32,19 @@ setup_libvirt:
 		sudo dnf install -y sshpass libvirt-devel libvirt-daemon libvirt-daemon-config-network; \
 	fi
 	sudo systemctl restart libvirtd
+
+.PHONY: install_coreos_installer
+install_coreos_installer:
+	sudo $(PKG_MANAGER) install -y coreos-installer;
+
+.PHONY: generate_private_key
+generate_private_key:
+	sudo mkdir -p $(E2E_PRIVATE_KEY_FOLDER_PATH) && \
+	sudo chown -R $(shell whoami):$(shell whoami) $(E2E_PRIVATE_KEY_FOLDER_PATH); \
+	if [ ! -f $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key ]; then \
+		make build && \
+		bin/planner sso private-key > $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key; \
+	fi
 
 .PHONY: deploy_registry
 deploy_registry:
@@ -69,6 +84,7 @@ deploy_assisted_migration:
 	sleep 30
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &
+	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 &
 
 .PHONY: persistent_disk
 persistent_disk:
