@@ -196,8 +196,8 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil(), "Failed to remove sources from DB")
 		err = agent.Remove()
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
-		err = EnableServiceConnection()
-		Expect(err).To(BeNil(), "Failed to enable service connection")
+		//err = EnableServiceConnection()
+		//Expect(err).To(BeNil(), "Failed to enable service connection")
 	})
 
 	AfterFailed(func() {
@@ -219,6 +219,9 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 			inventory, err := agent.Inventory()
 			Expect(err).To(BeNil())
+
+			err = EnableServiceConnection()
+			Expect(err).To(BeNil(), "Failed to enable service connection")
 
 			err = svc.UpdateSource(source.Id, inventory)
 			Expect(err).To(BeNil())

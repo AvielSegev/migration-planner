@@ -235,7 +235,11 @@ func DisableServiceConnection() error {
 	ports := []string{"7443", "3443"}
 
 	for _, port := range ports {
-		output, err := RunLocalCommand(fmt.Sprintf("lsof -ti :%s", port))
+		output, _ := RunLocalCommand(fmt.Sprintf(
+			"lsof -ti :%s | "+
+				"xargs -r ps -o pid=,comm= | "+
+				"awk '$2 == \"kubectl\" {print $1}'\n", port))
+
 		if err != nil {
 			if strings.Contains(err.Error(), "command failed") {
 				continue // No process found for this port
@@ -243,13 +247,11 @@ func DisableServiceConnection() error {
 			return fmt.Errorf("failed to find process for port %s: %v", port, err)
 		}
 
-		pids := strings.Fields(output)
-		for _, pid := range pids {
-			_, err := RunLocalCommand("kill " + pid)
-			if err != nil {
-				return fmt.Errorf("failed to kill process %s for port %s: %v", pid, port, err)
-			}
+		pid := strings.Split(output, " ")[0]
+		if _, err = RunLocalCommand("kill " + pid); err != nil {
+			return fmt.Errorf("failed to kill process %s for port %s: %v", pid, port, err)
 		}
+
 	}
 
 	return nil
