@@ -32,3 +32,8 @@ jobs:
       - name: Run test
         run: |
           sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
