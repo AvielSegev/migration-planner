@@ -97,12 +97,12 @@ func (p *plannerAgentLibvirt) Run() error {
 		return err
 	}
 
-	if testOptions.disconnectedEnvironment {
-		// Modifying the planner-service.service.server value inside config.yaml to use an incorrect address for testing purposes
-		if err := p.DisableServiceConnection(); err != nil {
-			return err
-		}
-	}
+	//if testOptions.disconnectedEnvironment {
+	//	// Modifying the planner-service.service.server value inside config.yaml to use an incorrect address for testing purposes
+	//	if err := p.DisableServiceConnection(); err != nil {
+	//		return err
+	//	}
+	//}
 
 	err := p.CreateVm()
 	if err != nil {
@@ -496,6 +496,20 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
+
+	if testOptions.disconnectedEnvironment {
+
+		toStrPtr := func(s string) *string {
+			return &s
+		}
+
+		params.Proxy = &api.AgentProxy{
+			HttpUrl:  toStrPtr("127.0.0.1"),
+			HttpsUrl: toStrPtr("127.0.0.1"),
+			NoProxy:  toStrPtr("noproxy"),
+		}
+	}
+
 	res, err := s.c.CreateSourceWithResponse(ctx, params, attachJWT)
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
 		return nil, fmt.Errorf("failed to create the source: %v", err)
