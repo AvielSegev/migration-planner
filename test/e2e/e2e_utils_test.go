@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/cli"
+	"go.uber.org/zap"
 	"io"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 
 // Create VM with the UUID of the source created
 func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
+	zap.S().Info("Creating agent...")
 	agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
 	if err != nil {
 		return nil, err
@@ -23,11 +25,13 @@ func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName str
 	if err != nil {
 		return nil, err
 	}
+	zap.S().Info("Agent created successfully")
 	return agent, nil
 }
 
 // store the ip case there is no error
 func FindAgentIp(agent PlannerAgent, agentIP *string) error {
+	zap.S().Info("try to retrieve agent ip")
 	ip, err := agent.GetIp()
 	if err != nil {
 		return err
@@ -44,15 +48,19 @@ func IsPlannerAgentRunning(agent PlannerAgent, agentIP string) bool {
 func AgentIsUpToDate(svc PlannerService, uuid uuid.UUID) bool {
 	source, err := svc.GetSource(uuid)
 	if err != nil {
+		zap.S().Errorf("Error getting source.")
 		return false
 	}
+	zap.S().Infof("agent status is: %s", string(source.Agent.Status))
 	return source.Agent.Status == v1alpha1.AgentStatusUpToDate
 }
 
 // helper function for wait until the service return correct credential url for a source by UUID
 func CredentialURL(svc PlannerService, uuid uuid.UUID) string {
+	zap.S().Info("try to retrieve valid credentials url")
 	s, err := svc.GetSource(uuid)
 	if err != nil {
+		zap.S().Errorf("Error getting source.")
 		return ""
 	}
 	if s.Agent == nil {
