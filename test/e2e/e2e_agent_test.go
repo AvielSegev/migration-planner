@@ -106,7 +106,7 @@ func (p *plannerAgentLibvirt) AgentApi() (*AgentApi, error) {
 	if p.localApi != nil {
 		return p.localApi, nil
 	}
-	agentIP, err = p.GetIp()
+	agentIP, err := p.GetIp()
 	if err != nil {
 		return nil, err
 	}

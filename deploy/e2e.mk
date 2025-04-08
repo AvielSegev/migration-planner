@@ -47,7 +47,7 @@ deploy_registry:
 	$(KUBECTL) create deployment registry --image=docker.io/registry
 	$(KUBECTL) rollout status deployment/registry --timeout=60s
 	$(KUBECTL) wait --for=condition=Ready pods --all --timeout=240s
-	$(KUBECTL) port-forward --address 0.0.0.0 deploy/registry 5000:5000 &
+	$(KUBECTL) port-forward --address 0.0.0.0 deploy/registry 5000:5000 > /dev/null 2>&1 &
 
 .PHONY: deploy_vcsim
 deploy_vcsim:
@@ -62,8 +62,8 @@ deploy_vcsim:
 	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
 
 	$(KUBECTL) wait --for=condition=Ready pods --all --timeout=240s
-	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 &
-	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim2 8990:8990 &
+	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 > /dev/null 2>&1 &
+	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim2 8990:8990 > /dev/null 2>&1 &
 
 .PHONY: build_assisted_migration_containers
 build_assisted_migration_containers:
@@ -78,9 +78,9 @@ deploy_assisted_migration:
 	make deploy-on-kind MIGRATION_PLANNER_NAMESPACE=default PERSISTENT_DISK_DEVICE=/dev/vda
 	$(KUBECTL) wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
-	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &
-	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &
-	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 &
+	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &
+	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner 3443:3443 > /dev/null 2>&1 &
+	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 > /dev/null 2>&1 &
 
 .PHONY: persistent_disk
 persistent_disk:

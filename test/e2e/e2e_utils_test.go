@@ -7,76 +7,62 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/cli"
-	. "github.com/onsi/gomega"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-// Create a source in the DB using the API
-func CreateSource(name string) *v1alpha1.Source {
-	source, err := svc.CreateSource(name)
-	Expect(err).To(BeNil())
-	Expect(source).NotTo(BeNil())
-	return source
-}
-
 // Create VM with the UUID of the source created
-func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, string) {
+func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
 	agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
-	Expect(err).To(BeNil(), "Failed to create PlannerAgent")
+	if err != nil {
+		return nil, err
+	}
 	err = agent.Run()
-	Expect(err).To(BeNil(), "Failed to run PlannerAgent")
-	var agentIP string
-	Eventually(func() string {
-		agentIP, err = agent.GetIp()
-		if err != nil {
-			return ""
-		}
-		return agentIP
-	}, "4m", "2s").ShouldNot(BeEmpty())
-	Expect(agentIP).ToNot(BeEmpty())
-	Eventually(func() bool {
-		return agent.IsServiceRunning(agentIP, "planner-agent")
-	}, "4m", "2s").Should(BeTrue())
-	return agent, agentIP
+	if err != nil {
+		return nil, err
+	}
+	return agent, nil
 }
 
-// Login to VSphere and put the credentials
-func LoginToVsphere(agentApi PlannerAgentAPI, address string, port string, username string, password string, expectedStatusCode int) {
-	res, err := agentApi.Login(fmt.Sprintf("https://%s:%s/sdk", address, port), username, password)
-	Expect(err).To(BeNil())
-	Expect(res.StatusCode).To(Equal(expectedStatusCode))
+// store the ip case there is no error
+func FindAgentIp(agent PlannerAgent, agentIP *string) error {
+	ip, err := agent.GetIp()
+	if err != nil {
+		return err
+	}
+	*agentIP = ip
+	return nil
 }
 
-// check that source is up to date eventually
-func WaitForAgentToBeUpToDate(uuid uuid.UUID) {
-	Eventually(func() bool {
-		source, err := svc.GetSource(uuid)
-		if err != nil {
-			return false
-		}
-		return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-	}, "6m", "2s").Should(BeTrue())
+func IsPlannerAgentRunning(agent PlannerAgent, agentIP string) bool {
+	return agent.IsServiceRunning(agentIP, "planner-agent")
 }
 
-// Wait for the service to return correct credential url for a source by UUID
-func WaitForValidCredentialURL(uuid uuid.UUID, agentIP string) {
-	Eventually(func() string {
-		s, err := svc.GetSource(uuid)
-		if err != nil {
-			return ""
-		}
-		if s.Agent == nil {
-			return ""
-		}
-		if s.Agent.CredentialUrl != "N/A" && s.Agent.CredentialUrl != "" {
-			return s.Agent.CredentialUrl
-		}
+// helper function to check that source is up to date eventually
+func AgentIsUpToDate(svc PlannerService, uuid uuid.UUID) bool {
+	source, err := svc.GetSource(uuid)
+	if err != nil {
+		return false
+	}
+	return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+}
 
+// helper function for wait until the service return correct credential url for a source by UUID
+func CredentialURL(svc PlannerService, uuid uuid.UUID) string {
+	s, err := svc.GetSource(uuid)
+	if err != nil {
 		return ""
-	}, "4m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
+	}
+	if s.Agent == nil {
+		return ""
+	}
+	if s.Agent.CredentialUrl != "N/A" && s.Agent.CredentialUrl != "" {
+		return s.Agent.CredentialUrl
+	}
+
+	return ""
 }
 
 func ValidateTar(file *os.File) error {
