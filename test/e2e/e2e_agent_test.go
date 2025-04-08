@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kubev2v/migration-planner/internal/agent/common"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"os"
@@ -171,10 +172,13 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 		return fmt.Errorf("failed to write to the file: %w", err)
 	}
 
+	zap.S().Infof("Successfully downloaded ova file: %s", defaultOvaPath)
+
 	if err := p.ovaValidateAndExtract(ovaFile); err != nil {
 		return err
 	}
 
+	zap.S().Infof("Successfully extract the ISO from the OVA.")
 	return nil
 }
 
@@ -383,6 +387,8 @@ func (api *AgentApi) Version() (string, error) {
 
 func (api *AgentApi) Login(url string, user string, pass string) (*http.Response, error) {
 
+	zap.S().Infof("Attempting vCenter login with URL: %s, User: %s", url, user)
+
 	credentials := map[string]string{
 		"url":      url,
 		"username": user,
@@ -434,6 +440,7 @@ func (api *AgentApi) Status() (*coreAgent.StatusReply, error) {
 		return nil, fmt.Errorf("error decoding JSON: %v", err)
 	}
 
+	zap.S().Infof("Agent status: %s. Connected to the Service: %s", result.Status, result.Connected)
 	return &result, nil
 }
 
@@ -462,16 +469,19 @@ func (api *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
 }
 
 func NewPlannerService(configPath string) (*plannerService, error) {
+	zap.S().Info("Initializing PlannerService...")
 	_ = createConfigFile(configPath)
 	c, err := client.NewFromConfigFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
+	zap.S().Info("PlannerService created successfully")
 	return &plannerService{c: c}, nil
 }
 
 func (s *plannerService) CreateSource(name string) (*api.Source, error) {
+	zap.S().Info("Creating source...")
 	user, err := defaultUserAuth()
 	if err != nil {
 		return nil, err
@@ -502,6 +512,7 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 		return nil, fmt.Errorf("failed to create the source")
 	}
 
+	zap.S().Info("Source created successfully")
 	return res.JSON201, nil
 }
 
