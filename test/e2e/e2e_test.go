@@ -93,8 +93,7 @@ var _ = Describe("e2e", func() {
 	})
 
 	Context("Check Vcenter login behavior", func() {
-		It("should successfully login with valid credentials and should "+
-			"fail to authenticate with invalid vSphere credentials. ", func() {
+		It("succeeds login only for valid credentials", func() {
 
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
@@ -187,43 +186,46 @@ var _ = Describe("e2e", func() {
 				return AgentIsUpToDate(svc, source.Id)
 			}, "3m", "2s").Should(BeTrue())
 
-			source2, err := svc.CreateSource("source-2")
-			Expect(err).To(BeNil())
-			Expect(source2).NotTo(BeNil())
+			// Run source-2 and agent-2 lifecycle in parallel (create, verify, login, cleanup)
+			go func() {
+				source2, err := svc.CreateSource("source-2")
+				Expect(err).To(BeNil())
+				Expect(source2).NotTo(BeNil())
 
-			agent2, err := CreateAgent(defaultConfigPath, "2", source2.Id, vmName+"-2")
-			Expect(err).To(BeNil())
+				agent2, err := CreateAgent(defaultConfigPath, "2", source2.Id, vmName+"-2")
+				Expect(err).To(BeNil())
 
-			var agentIP2 string
-			Eventually(func() error {
-				return FindAgentIp(agent2, &agentIP2)
-			}, "3m", "2s").Should(BeNil())
+				var agentIP2 string
+				Eventually(func() error {
+					return FindAgentIp(agent2, &agentIP2)
+				}, "3m", "2s").Should(BeNil())
 
-			Eventually(func() bool {
-				return IsPlannerAgentRunning(agent2, agentIP2)
-			}, "3m", "2s").Should(BeTrue())
+				Eventually(func() bool {
+					return IsPlannerAgentRunning(agent2, agentIP2)
+				}, "3m", "2s").Should(BeTrue())
 
-			agent2Api, err := agent2.AgentApi()
-			Expect(err).To(BeNil())
+				agent2Api, err := agent2.AgentApi()
+				Expect(err).To(BeNil())
 
-			Eventually(func() string {
-				return CredentialURL(svc, source2.Id)
-			}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
+				Eventually(func() string {
+					return CredentialURL(svc, source2.Id)
+				}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
 
-			// Login to Vcsim2
-			res, err = agent2Api.Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere2Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+				// Login to Vcsim2
+				res, err = agent2Api.Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere2Port),
+					"core", "123456")
+				Expect(err).To(BeNil())
+				Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+				zap.S().Info("Vcenter login completed successfully. Credentials saved.")
 
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source2.Id)
-			}, "3m", "2s").Should(BeTrue())
+				zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
+				Eventually(func() bool {
+					return AgentIsUpToDate(svc, source2.Id)
+				}, "3m", "2s").Should(BeTrue())
 
-			err = agent2.Remove()
-			Expect(err).To(BeNil())
+				err = agent2.Remove()
+				Expect(err).To(BeNil())
+			}()
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
