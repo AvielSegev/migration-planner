@@ -4,8 +4,10 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/cli"
 	"go.uber.org/zap"
 	"io"
@@ -17,9 +19,9 @@ import (
 )
 
 // Create VM with the UUID of the source created
-func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
+func CreateAgent(idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
 	zap.S().Info("Creating agent...")
-	agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
+	agent, err := NewPlannerAgent(uuid, vmName, idForTest)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +239,20 @@ func RemoveFile(fullPath string) error {
 		}
 	}
 	return nil
+}
+
+func defaultUserAuth() (*auth.User, error) {
+	tokenVal, err := getToken(defaultUsername, defaultOrganization)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create user: %v", err)
+	}
+	token := jwt.New(jwt.SigningMethodRS256)
+	token.Raw = tokenVal
+	return &auth.User{
+		Username:     defaultUsername,
+		Organization: defaultOrganization,
+		Token:        token,
+	}, nil
 }
 
 func logExecutionSummary() {
