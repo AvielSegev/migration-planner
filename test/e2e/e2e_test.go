@@ -29,14 +29,14 @@ var _ = Describe("e2e", func() {
 		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = false
 
-		svc, err = NewPlannerService()
+		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -179,7 +179,7 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(source2).NotTo(BeNil())
 
-			agent2, err := CreateAgent("2", source2.Id, VmName+"-2")
+			agent2, err := CreateAgent("2", source2.Id, VmName+"-2", svc)
 			Expect(err).To(BeNil())
 
 			var agentIP2 string
