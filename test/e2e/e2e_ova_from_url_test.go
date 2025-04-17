@@ -30,14 +30,14 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		TestOptions.DownloadImageByUrl = true
 		TestOptions.DisconnectedEnvironment = false
 
-		svc, err = NewPlannerService()
+		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")

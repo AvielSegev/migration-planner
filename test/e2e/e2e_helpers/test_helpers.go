@@ -9,9 +9,9 @@ import (
 )
 
 // CreateAgent Create VM with the UUID of the source created
-func CreateAgent(idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
+func CreateAgent(idForTest string, uuid uuid.UUID, vmName string, svc PlannerService) (PlannerAgent, error) {
 	zap.S().Info("Creating agent...")
-	agent, err := NewPlannerAgent(uuid, vmName, idForTest)
+	agent, err := NewPlannerAgent(uuid, vmName, idForTest, svc)
 	if err != nil {
 		return nil, err
 	}
