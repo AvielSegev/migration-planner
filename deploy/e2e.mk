@@ -50,16 +50,18 @@ deploy_registry:
 	$(KUBECTL) port-forward --address 0.0.0.0 deploy/registry 5000:5000 > /dev/null 2>&1 &
 
 .PHONY: deploy_vcsim
-deploy_vcsim:
-	sed "s|@APP-NAME@|"vcsim1"|g; \
-		  s|@PORT@|"8989"|g" \
-			deploy/k8s/vcsim.yaml.template > deploy/k8s/vcsim.yaml
-	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
+deploy_vcsim: oc
+	oc process --local -f deploy/templates/vcsim-template.yml \
+		-p APP_NAME=vcsim1 \
+		-p PORT=8989 \
+		-p USERNAME=core \
+		-p PASSWORD=123456 | oc apply -f -
 
-	sed "s|@APP-NAME@|"vcsim2"|g; \
-		  s|@PORT@|"8990"|g" \
-			deploy/k8s/vcsim.yaml.template > deploy/k8s/vcsim.yaml
-	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
+	oc process --local -f deploy/templates/vcsim-template.yml \
+		-p APP_NAME=vcsim2 \
+		-p PORT=8990 \
+		-p USERNAME=core \
+		-p PASSWORD=123456 | oc apply -f -
 
 	$(KUBECTL) wait --for=condition=Ready pods --all --timeout=240s
 	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 > /dev/null 2>&1 &
