@@ -74,6 +74,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 	})
 
 	AfterEach(func() {
+		ExtractBootLogs(CurrentSpecReport().LeafNodeText, agentIP)
 		zap.S().Info("Cleaning up after test...")
 		err = svc.RemoveSources()
 		Expect(err).To(BeNil(), "Failed to remove sources from DB")

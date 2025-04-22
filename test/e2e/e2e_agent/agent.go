@@ -8,6 +8,9 @@ import (
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -53,6 +56,21 @@ func (p *plannerAgentLibvirt) AgentApi() *AgentApi {
 func (p *plannerAgentLibvirt) DumpLogs(agentIp string) {
 	stdout, _ := RunSSHCommand(agentIp, "journalctl --no-pager")
 	fmt.Fprintf(GinkgoWriter, "Journal: %v\n", stdout)
+}
+
+func ExtractBootLogs(test string, agentIp string) {
+	zap.S().Infof("Extracting boot logs from %s", agentIp)
+	stdout, _ := RunSSHCommand(agentIp, "journalctl --no-pager")
+	filename := strings.Replace(fmt.Sprintf("%s.log", test), " ", "_", -1)
+	filePath := filepath.Join("/home/asegev/work/migration-planner/logs", filename)
+
+	err := os.WriteFile(filePath, []byte(stdout), 0644)
+	if err != nil {
+		zap.S().Errorf("Failed to write log file: %v", err)
+		panic(err)
+	}
+
+	zap.S().Infof("Boot logs saved to %s", filePath)
 }
 
 // GetIp retrieves the IP address of the agent VM
