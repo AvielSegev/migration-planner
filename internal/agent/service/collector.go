@@ -152,11 +152,35 @@ func (c *Collector) run() {
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
 	fillInventoryObjectWithMoreData(vms, inv)
 
+	zap.S().Named("collector").Infof("")
+	unifyEqualMigrationIssuesAssessment(inv)
+
 	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
 		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %v", err)
 		return
 	}
+}
+
+func unifyEqualMigrationIssuesAssessment(inv *apiplanner.Inventory) {
+	issues := inv.Vms.MigrationWarnings
+
+	assessmentCount := make(map[string]int, len(issues))
+
+	unifiedWarnings := apiplanner.MigrationIssues{}
+
+	for _, issue := range issues {
+		assessmentCount[issue.Assessment] += issue.Count
+	}
+
+	for assessment, count := range assessmentCount {
+		unifiedWarnings = append(unifiedWarnings, NotMigratableReason{
+			Assessment: assessment,
+			Count:      count,
+		})
+	}
+
+	inv.Vms.MigrationWarnings = unifiedWarnings
 }
 
 func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
@@ -672,6 +696,7 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 			}
 		}
 	}
+
 	if hasWarning {
 		if inv.Vms.TotalMigratableWithWarnings == nil {
 			total := 0
