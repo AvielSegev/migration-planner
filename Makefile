@@ -137,6 +137,9 @@ migration-planner-agent-container: bin/.migration-planner-agent-container
 
 build-containers: migration-planner-api-container migration-planner-agent-container
 
+build-standalone-collector:
+	$(PODMAN) build . --build-arg -f Containerfile.standalone-collector -t planner-standalone-collector
+
 .PHONY: build-containers
 
 quay-login:
