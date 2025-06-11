@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
+	"html/template"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,6 +38,7 @@ type CollectOptions struct {
 	url                   string
 	password              string
 	collectionTimeout     time.Duration
+	htmlReport            bool
 }
 
 func NewCollectOptions() *CollectOptions {
@@ -62,6 +65,7 @@ func NewCmdCollect() *cobra.Command {
 }
 
 func (o *CollectOptions) Bind(fs *pflag.FlagSet) {
+	fs.BoolVar(&o.htmlReport, "html", false, "")
 	fs.StringVar(&o.dataDir, "data-dir", defaultDataDir, "directory where the agent will write its data")
 	fs.StringVar(&o.credentialsDir, "credentials-dir", defaultCredentialsDir, "directory where credentials are stored")
 	fs.StringVarP(&o.username, "username", "u", "", "vsphere username")
@@ -86,6 +90,12 @@ func (o *CollectOptions) Run(ctx context.Context, args []string) error {
 
 	if err := o.collect(ctx, o.collectionTimeout); err != nil {
 		err = fmt.Errorf("error generate the ivnentory.json: %v", err)
+	}
+
+	if o.htmlReport {
+		if err := o.convertToHTML(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -198,4 +208,44 @@ func waitForFile(filename string, timeout time.Duration) error {
 			}
 		}
 	}
+}
+
+func (o *CollectOptions) convertToHTML() error {
+
+	inv, err := o.loadInventory()
+	if err != nil {
+		return fmt.Errorf("error loading inventory: %v", err)
+	}
+
+	tmpl, err := template.ParseFiles("data/template.html")
+	if err != nil {
+		return fmt.Errorf("error to parse template: %v", err)
+	}
+
+	outputFile, err := os.Create(o.inventoryHTMLFilePath)
+	if err != nil {
+		return fmt.Errorf("error to create output HTML file: %v", err)
+	}
+	defer outputFile.Close()
+
+	err = tmpl.Execute(outputFile, inv)
+	if err != nil {
+		return fmt.Errorf("error to execute template: %v", err)
+	}
+
+	return nil
+}
+
+func (o *CollectOptions) loadInventory() (*api.Inventory, error) {
+	jsonBytes, err := os.ReadFile(o.inventoryFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("error to read inventory file: %v", err)
+	}
+
+	var invData service.InventoryData
+	if err := json.Unmarshal(jsonBytes, &invData); err != nil {
+		return nil, fmt.Errorf("error to unmarshal JSON: %v", err)
+	}
+
+	return &invData.Inventory, nil
 }

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Inventory Report</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f0f0f0; }
+        h2 { margin-top: 40px; }
+    </style>
+</head>
+<body>
+<h1>Inventory Report</h1>
+
+<h2>VCenter</h2>
+<p><strong>ID:</strong> {{ .Vcenter.Id }}</p>
+
+<h2>Infra Summary</h2>
+<ul>
+    <li><strong>Total Clusters:</strong> {{ .Infra.TotalClusters }}</li>
+    <li><strong>Total Datacenters:</strong> {{ .Infra.TotalDatacenters }}</li>
+    <li><strong>Total Hosts:</strong> {{ .Infra.TotalHosts }}</li>
+</ul>
+
+<h3>Datastores</h3>
+<table>
+    <tr>
+        <th>Disk ID</th><th>Vendor</th><th>Model</th><th>Type</th><th>Protocol</th>
+        <th>Free GB</th><th>Total GB</th><th>Hardware Accelerated</th>
+    </tr>
+    {{ range .Infra.Datastores }}
+    <tr>
+        <td>{{ .DiskId }}</td>
+        <td>{{ .Vendor }}</td>
+        <td>{{ .Model }}</td>
+        <td>{{ .Type }}</td>
+        <td>{{ .ProtocolType }}</td>
+        <td>{{ .FreeCapacityGB }}</td>
+        <td>{{ .TotalCapacityGB }}</td>
+        <td>{{ .HardwareAcceleratedMove }}</td>
+    </tr>
+    {{ end }}
+</table>
+
+<h3>Networks</h3>
+<table>
+    <tr>
+        <th>Name</th><th>Type</th><th>DVSwitch</th><th>VLAN ID</th>
+    </tr>
+    {{ range .Infra.Networks }}
+    <tr>
+        <td>{{ .Name }}</td>
+        <td>{{ .Type }}</td>
+        <td>{{ if .Dvswitch }}{{ .Dvswitch }}{{ else }}N/A{{ end }}</td>
+        <td>{{ if .VlanId }}{{ .VlanId }}{{ else }}N/A{{ end }}</td>
+    </tr>
+    {{ end }}
+</table>
+
+<h3>Host Power States</h3>
+<table>
+    <tr><th>Host</th><th>Power State</th></tr>
+    {{ range $host, $state := .Infra.HostPowerStates }}
+    <tr><td>{{ $host }}</td><td>{{ $state }}</td></tr>
+    {{ end }}
+</table>
+
+<h3>Hosts Per Cluster</h3>
+<ul>
+    {{ range .Infra.HostsPerCluster }}
+    <li>{{ . }}</li>
+    {{ end }}
+</ul>
+
+<h2>VMs Summary</h2>
+<ul>
+    <li><strong>Total VMs:</strong> {{ .Vms.Total }}</li>
+    <li><strong>Total Migratable:</strong> {{ .Vms.TotalMigratable }}</li>
+    <li><strong>Total Migratable With Warnings:</strong> {{ if .Vms.TotalMigratableWithWarnings }}{{ .Vms.TotalMigratableWithWarnings }}{{ else }}N/A{{ end }}</li>
+</ul>
+
+<h3>Operating Systems</h3>
+<table>
+    <tr><th>OS</th><th>Count</th></tr>
+    {{ range $os, $count := .Vms.Os }}
+    <tr><td>{{ $os }}</td><td>{{ $count }}</td></tr>
+    {{ end }}
+</table>
+
+<h3>Power States</h3>
+<table>
+    <tr><th>State</th><th>Count</th></tr>
+    {{ range $state, $count := .Vms.PowerStates }}
+    <tr><td>{{ $state }}</td><td>{{ $count }}</td></tr>
+    {{ end }}
+</table>
+
+<h3>Migration Warnings</h3>
+<table>
+    <tr><th>Label</th><th>Assessment</th><th>Count</th></tr>
+    {{ range .Vms.MigrationWarnings }}
+    <tr>
+        <td>{{ .Label }}</td>
+        <td>{{ .Assessment }}</td>
+        <td>{{ .Count }}</td>
+    </tr>
+    {{ end }}
+</table>
+
+<h3>Not Migratable Reasons</h3>
+<table>
+    <tr><th>Label</th><th>Assessment</th><th>Count</th></tr>
+    {{ range .Vms.NotMigratableReasons }}
+    <tr>
+        <td>{{ .Label }}</td>
+        <td>{{ .Assessment }}</td>
+        <td>{{ .Count }}</td>
+    </tr>
+    {{ end }}
+</table>
+
+</body>
+</html>
