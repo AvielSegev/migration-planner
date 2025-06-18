@@ -17,7 +17,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -88,18 +87,21 @@ func (o *CollectOptions) Run(ctx context.Context, args []string) error {
 
 	log.Printf("▶️  Launching OPA server from policies at %s", o.opaPoliciesFolderPath)
 
-	opaCmd, err := backgroundStartOPA(o.opaPoliciesFolderPath)
-	if err != nil {
-		return fmt.Errorf("error running opa server: %w", err)
-	}
+	//go func() {
+	//	_ = backgroundStartOPA(ctx, o.opaPoliciesFolderPath)
+	//if err != nil {
+	//	return fmt.Errorf("error running opa server: %w", err)
+	//}
+	//}()
+
 	defer func() {
-		_ = opaCmd.Process.Kill()
-		_ = opaCmd.Wait()
+		//_ = opaCmd.Process.Kill()
+		//_ = opaCmd.Wait()
 		_ = os.Remove(o.credentialsFilePath)
 		_ = os.Remove(o.inventoryFilePath)
 	}()
 
-	log.Printf("🏃  OPA server running (pid=%d)", opaCmd.Process.Pid)
+	//log.Printf("🏃  OPA server running (pid=%d)", opaCmd.Process.Pid)
 
 	log.Printf("Checking if credentials provided using CMD...")
 
@@ -192,26 +194,26 @@ func (o *CollectOptions) useCmdCredentials() error {
 	return nil
 }
 
-func backgroundStartOPA(policyDir string) (*exec.Cmd, error) {
-	if _, err := os.Stat(policyDir); err != nil {
-		return nil, fmt.Errorf("cannot find policies in %s: %w", policyDir, err)
-	}
-
-	if _, err := exec.LookPath("opa"); err != nil {
-		return nil, fmt.Errorf("opa binary not found in PATH: %w", err)
-	}
-
-	cmd := exec.Command("opa", "run", policyDir, "--server")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = nil
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start opa: %w", err)
-	}
-
-	return cmd, nil
-}
+//func backgroundStartOPA(policyDir string) (*exec.Cmd, error) {
+//	if _, err := os.Stat(policyDir); err != nil {
+//		return nil, fmt.Errorf("cannot find policies in %s: %w", policyDir, err)
+//	}
+//
+//	if _, err := exec.LookPath("opa"); err != nil {
+//		return nil, fmt.Errorf("opa binary not found in PATH: %w", err)
+//	}
+//
+//	cmd := exec.Command("opa", "run", policyDir, "--server")
+//	cmd.Stdout = os.Stdout
+//	cmd.Stderr = os.Stderr
+//	cmd.Stdin = nil
+//
+//	if err := cmd.Start(); err != nil {
+//		return nil, fmt.Errorf("failed to start opa: %w", err)
+//	}
+//
+//	return cmd, nil
+//}
 
 func (o *CollectOptions) stopServer() {
 	serverCh := make(chan any)
