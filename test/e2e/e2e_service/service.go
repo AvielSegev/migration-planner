@@ -3,6 +3,7 @@ package e2e_service
 import (
 	"encoding/json"
 	"fmt"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"io"
 	"net/http"
 
@@ -12,7 +13,6 @@ import (
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"go.uber.org/zap"
 )
 

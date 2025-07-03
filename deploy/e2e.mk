@@ -68,6 +68,15 @@ deploy_vcsim: oc
 	oc port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 > /dev/null 2>&1 &
 	oc port-forward --address 0.0.0.0 deploy/vcsim2 8990:8990 > /dev/null 2>&1 &
 
+.PHONY: deploy_keycloak
+deploy_keycloak: oc
+	$(PODMAN) pull quay.io/keycloak/keycloak:26.3.0
+	kind load docker-image quay.io/keycloak/keycloak:26.3.0 --name $(E2E_CLUSTER_NAME)
+	$(PODMAN) pull mirror.gcr.io/postgres:17
+	kind load docker-image mirror.gcr.io/postgres:17 --name $(E2E_CLUSTER_NAME)
+	oc process --local -f deploy/templates/keycloak-template.yml | oc apply -f -
+	oc port-forward --address 0.0.0.0 Service/keycloak 8080:8080 > /dev/null 2>&1 &
+
 .PHONY: build_assisted_migration_containers
 build_assisted_migration_containers:
 	make migration-planner-agent-container
@@ -82,8 +91,6 @@ deploy_assisted_migration: oc
 	oc wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
 	oc port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &
-	oc port-forward --address 0.0.0.0 service/migration-planner 3443:3443 > /dev/null 2>&1 &
-	oc port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 > /dev/null 2>&1 &
 
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:

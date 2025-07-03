@@ -1,0 +1,206 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: keycloak-postgres-template
+objects:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: keycloak
+      labels:
+        app: ${APP_NAME}
+    spec:
+      ports:
+        - protocol: TCP
+          port: 8080
+          targetPort: http
+          name: http
+      selector:
+        app: ${APP_NAME}
+      type: ClusterIP
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: keycloak-discovery
+      labels:
+        app: ${APP_NAME}
+    spec:
+      selector:
+        app: ${APP_NAME}
+      publishNotReadyAddresses: true
+      clusterIP: None
+      type: ClusterIP
+
+  - apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: keycloak
+      labels:
+        app: ${APP_NAME}
+    spec:
+      serviceName: keycloak-discovery
+      replicas: 2
+      selector:
+        matchLabels:
+          app: ${APP_NAME}
+      template:
+        metadata:
+          labels:
+            app: ${APP_NAME}
+        spec:
+          containers:
+            - name: keycloak
+              image: ${KEYCLOAK_IMAGE}
+              args: ["start"]
+              env:
+                - name: KC_BOOTSTRAP_ADMIN_USERNAME
+                  value: ${KEYCLOAK_ADMIN_USER}
+                - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+                  value: ${KEYCLOAK_ADMIN_PASSWORD}
+                - name: KC_PROXY_HEADERS
+                  value: "xforwarded"
+                - name: KC_HTTP_ENABLED
+                  value: "true"
+                - name: KC_HOSTNAME_STRICT
+                  value: "false"
+                - name: KC_HEALTH_ENABLED
+                  value: "true"
+                - name: KC_CACHE
+                  value: "ispn"
+                - name: KC_CACHE_STACK
+                  value: "kubernetes"
+                - name: POD_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - name: JAVA_OPTS_APPEND
+                  value: '-Djgroups.dns.query="keycloak-discovery" -Djgroups.bind.address=$(POD_IP)'
+                - name: KC_DB_URL_DATABASE
+                  value: keycloak
+                - name: KC_DB_URL_HOST
+                  value: ${POSTGRES_SERVICE_NAME}
+                - name: KC_DB
+                  value: "postgres"
+                - name: KC_DB_PASSWORD
+                  value: ${POSTGRES_PASSWORD}
+                - name: KC_DB_USERNAME
+                  value: ${POSTGRES_USER}
+              ports:
+                - name: http
+                  containerPort: 8080
+              startupProbe:
+                httpGet:
+                  path: /health/started
+                  port: 9000
+                periodSeconds: 1
+                failureThreshold: 600
+              readinessProbe:
+                httpGet:
+                  path: /health/ready
+                  port: 9000
+                periodSeconds: 10
+                failureThreshold: 3
+              livenessProbe:
+                httpGet:
+                  path: /health/live
+                  port: 9000
+                periodSeconds: 10
+                failureThreshold: 3
+              resources:
+                limits:
+                  cpu: 2000m
+                  memory: 2000Mi
+                requests:
+                  cpu: 500m
+                  memory: 1700Mi
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: keycloak-postgres
+      labels:
+        app: ${POSTGRES_APP_NAME}
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: ${POSTGRES_APP_NAME}
+      template:
+        metadata:
+          labels:
+            app: ${POSTGRES_APP_NAME}
+        spec:
+          containers:
+            - name: postgres
+              image: ${POSTGRES_IMAGE}
+              env:
+                - name: POSTGRES_USER
+                  value: ${POSTGRES_USER}
+                - name: POSTGRES_PASSWORD
+                  value: ${POSTGRES_PASSWORD}
+                - name: POSTGRES_DB
+                  value: keycloak
+                - name: POSTGRES_LOG_STATEMENT
+                  value: "all"
+              ports:
+                - name: postgres
+                  containerPort: 5432
+              volumeMounts:
+                - name: postgres-data
+                  mountPath: /var/lib/postgresql
+          volumes:
+            - name: postgres-data
+              emptyDir: {}
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: ${POSTGRES_SERVICE_NAME}
+      labels:
+        app: ${POSTGRES_APP_NAME}
+    spec:
+      selector:
+        app: ${POSTGRES_APP_NAME}
+      ports:
+        - protocol: TCP
+          port: 5432
+          targetPort: 5432
+      type: ClusterIP
+
+parameters:
+  - name: APP_NAME
+    description: The name of the Keycloak app
+    value: keycloak
+
+  - name: KEYCLOAK_IMAGE
+    description: Keycloak container image
+    value: quay.io/keycloak/keycloak:26.3.0
+
+  - name: KEYCLOAK_ADMIN_USER
+    description: Bootstrap admin username
+    value: admin
+
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    description: Bootstrap admin password
+    value: admin
+
+  - name: POSTGRES_APP_NAME
+    description: App label for Postgres
+    value: keycloak-postgres
+
+  - name: POSTGRES_IMAGE
+    description: Postgres container image
+    value: mirror.gcr.io/postgres:17
+
+  - name: POSTGRES_SERVICE_NAME
+    description: Service name for Postgres
+    value: keycloak-postgres
+
+  - name: POSTGRES_USER
+    description: Postgres username
+    value: keycloak
+
+  - name: POSTGRES_PASSWORD
+    description: Postgres password
+    value: keycloak
