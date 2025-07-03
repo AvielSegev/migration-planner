@@ -73,6 +73,9 @@ build_assisted_migration_containers:
 	make migration-planner-agent-container
 	make migration-planner-api-container
 	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE)
+	$(PODMAN) pull quay.io/kubev2v/forklift-validation:latest
+	$(PODMAN) tag quay.io/kubev2v/forklift-validation:latest $(VALIDATION_CONTAINER_IMAGE)
+	$(PODMAN) push $(VALIDATION_CONTAINER_IMAGE)
 	kind load docker-image $(MIGRATION_PLANNER_API_IMAGE) --name $(E2E_CLUSTER_NAME)
 	$(PODMAN) rmi $(MIGRATION_PLANNER_API_IMAGE)
 
@@ -82,8 +85,6 @@ deploy_assisted_migration: oc
 	oc wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
 	oc port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &
-	oc port-forward --address 0.0.0.0 service/migration-planner 3443:3443 > /dev/null 2>&1 &
-	oc port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 > /dev/null 2>&1 &
 
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:
