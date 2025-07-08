@@ -9,6 +9,7 @@ VERBOSE ?= false
 VALIDATION_CONTAINER_IMAGE ?= quay.io/kubev2v/forklift-validation:latest
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
+MIGRATION_PLANNER_STANDALONE_IMAGE ?= standalone-agent:latest
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
@@ -134,6 +135,10 @@ migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
 
 build-containers: migration-planner-api-container migration-planner-agent-container
+
+build-standalone-agent: migration-planner-agent-container
+	$(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) \
+    		-f Containerfile.standalone-agent -t $(MIGRATION_PLANNER_STANDALONE_IMAGE)
 
 .PHONY: build-containers
 

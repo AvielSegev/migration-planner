@@ -1,0 +1,17 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+USER 0
+
+RUN mkdir -p /var/lib/planner /var/lib/data /etc/planner \
+ && echo '00000000-0000-0000-0000-000000000000' > /var/lib/data/agent_id \
+ && chown -R 1001:0 /var/lib/planner /var/lib/data /etc/planner
+
+RUN cat <<EOF > "/etc/planner/config.yaml"
+www-dir: /app/www
+source-id: 00000000-0000-0000-0000-000000000000
+EOF
+
+USER 1001
+
+ENTRYPOINT ["/app/planner-agent"]
