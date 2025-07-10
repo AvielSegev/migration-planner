@@ -31,15 +31,17 @@ func main() {
 type agentCmd struct {
 	config     *config.Config
 	configFile string
+	standalone bool
 }
 
 func NewAgentCommand() *agentCmd {
 
 	a := &agentCmd{
-		config:   config.NewDefault(),
+		config: config.NewDefault(),
 	}
 
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
+	flag.BoolVar(&a.standalone, "standalone", false, "Boolean flag indicating whether the agent runs in standalone mode")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
@@ -48,6 +50,12 @@ func NewAgentCommand() *agentCmd {
 	}
 
 	flag.Parse()
+
+	if a.standalone {
+		a.config.SourceID = uuid.Nil.String()
+		a.config.WwwDir = "/app/www"
+		return a
+	}
 
 	if err := a.config.ParseConfigFile(a.configFile); err != nil {
 		panic(fmt.Sprintf("Error parsing config: %v", err))
