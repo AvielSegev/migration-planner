@@ -13,14 +13,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// Handle policy discovery and file reading
+// PolicyReader Handle policy discovery and file reading
 type PolicyReader struct{}
 
 func NewPolicyReader() *PolicyReader {
 	return &PolicyReader{}
 }
 
-// Find the policies directory using OPA_POLICIES_DIR environment variable
+// DiscoverPoliciesDirectory Find the policies directory using OPA_POLICIES_DIR environment variable
 func (pr *PolicyReader) DiscoverPoliciesDirectory() string {
 	logger := zap.S().Named("opa")
 
@@ -37,7 +37,7 @@ func (pr *PolicyReader) DiscoverPoliciesDirectory() string {
 	return ""
 }
 
-// Read all .rego policy files from the specified directory
+// ReadPolicies Read all .rego policy files from the specified directory
 func (pr *PolicyReader) ReadPolicies(policiesDir string) (map[string]string, error) {
 	if !isPoliciesDirectory(policiesDir) {
 		return nil, fmt.Errorf("policies directory does not exist or contains no .rego files: %s", policiesDir)
@@ -94,7 +94,7 @@ func NewValidator(policies map[string]string) (*Validator, error) {
 	return validator, nil
 }
 
-// Compile the provided policy content and prepares the query
+// compilePolicies Compile the provided policy content and prepares the query
 func (v *Validator) compilePolicies(policies map[string]string) error {
 	compiler := ast.NewCompiler()
 	modules := make(map[string]*ast.Module)
@@ -132,7 +132,7 @@ func (v *Validator) compilePolicies(policies map[string]string) error {
 	return nil
 }
 
-// Validate the provided input against compiled policies
+// ValidateConcerns Validate the provided input against compiled policies
 func (v *Validator) ValidateConcerns(ctx context.Context, input interface{}) ([]interface{}, error) {
 	resultSet, err := v.preparedQuery.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
