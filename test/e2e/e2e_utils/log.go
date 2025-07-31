@@ -4,7 +4,8 @@ import (
 	"sort"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
+
 	"go.uber.org/zap"
 )
 

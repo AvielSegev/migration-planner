@@ -5,20 +5,17 @@ import (
 	"net/http"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
-
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_helpers"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 )
 
-var _ = Describe("e2e-disconnected-environment", func() {
-
+var _ = Describe("e2e-opa-validations", func() {
 	var (
 		svc       PlannerService
 		agent     PlannerAgent
@@ -30,7 +27,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DisconnectedEnvironment = true
+		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -62,14 +59,14 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		}, "3m", "2s").Should(BeTrue())
 		zap.S().Info("Planner-agent is now running")
 
-		zap.S().Info("Wait for agent server to start...")
-		Eventually(func() bool {
-			if _, err := agent.AgentApi().Status(); err != nil {
-				return false
+		Eventually(func() string {
+			credUrl, err := CredentialURL(svc, source.Id)
+			if err != nil {
+				return err.Error()
 			}
-			return true
-		}, "3m", "2s").Should(BeTrue())
-
+			return credUrl
+		}, "3m", "2s").
+			Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 		zap.S().Info("Setup complete for test.")
 	})
 
@@ -88,50 +85,26 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		agent.DumpLogs(agentIP)
 	})
 
-	Context("Flow", func() {
-		It("Disconnected-environment", func() {
+	Context("Validations test", func() {
+		It("Expect concerns list to not be empty", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			// Adding vcenter.com to /etc/hosts to enable connectivity to the vSphere server.
-			_, err := RunSSHCommand(agentIP, fmt.Sprintf("podman exec "+
-				"--user root "+
-				"planner-agent "+
-				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", SystemIP))
-			Expect(err).To(BeNil(), "Failed to enable connection to Vsphere")
-
-			// Login to Vcenter
-			Eventually(func() bool {
-				res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
-					"core", "123456")
-				return err == nil && res.StatusCode == http.StatusNoContent
-			}, "3m", "2s").Should(BeTrue())
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+				"core", "123456")
+			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
 			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				statusReply, err := agent.AgentApi().Status()
-				if err != nil {
-					return false
-				}
-				Expect(statusReply.Connected).Should(Equal("false"))
-				return statusReply.Connected == "false" && statusReply.Status == string(v1alpha1.AgentStatusUpToDate)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
-			// Get inventory
-			inventory, err := agent.AgentApi().Inventory()
+			inv, err := agent.AgentApi().Inventory()
 			Expect(err).To(BeNil())
-
-			// Manually upload the collected inventory data
-			err = svc.UpdateSource(source.Id, inventory)
-			Expect(err).To(BeNil())
-
-			// Verify that the inventory upload was successful
-			source, err = svc.GetSource(source.Id)
-			Expect(err).To(BeNil())
-			Expect(source.Agent).To(Not(BeNil()))
-			Expect(source.Agent.Status).Should(Equal(v1alpha1.AgentStatusNotConnected))
-			Expect(source.Agent.CredentialUrl).Should(BeEmpty())
-			Expect(source.Inventory).To(Equal(inventory))
+			Expect(inv.Vms.MigrationWarnings).ToNot(BeEmpty())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

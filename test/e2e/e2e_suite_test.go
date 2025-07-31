@@ -1,10 +1,12 @@
 package e2e_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
+
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,6 +38,14 @@ var _ = BeforeSuite(func() {
 	if logger != nil {
 		zap.ReplaceGlobals(logger)
 	}
+
+	err := CreateVsphereVM(
+		context.Background(),
+		fmt.Sprintf("https://core:123456@%s:%s/sdk", SystemIP, Vsphere1Port),
+		"rhel",
+		"rhel6_64Guest",
+	)
+	Expect(err).To(BeNil())
 })
 
 var _ = AfterSuite(func() {

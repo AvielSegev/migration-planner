@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
+
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/cli"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 )
 
 // GetToken retrieves the private key from the specified path, parses it, and then generates a token

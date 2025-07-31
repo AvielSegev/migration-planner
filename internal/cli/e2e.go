@@ -10,7 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
+
 	"github.com/libvirt/libvirt-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

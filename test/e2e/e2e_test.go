@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_helpers"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"

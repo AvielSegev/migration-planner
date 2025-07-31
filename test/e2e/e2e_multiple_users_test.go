@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_settings"
+
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	. "github.com/onsi/ginkgo/v2"
