@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,6 +26,7 @@ import (
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
+	validator "github.com/kubev2v/migration-planner/internal/agent/opa"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"go.uber.org/zap"
@@ -35,13 +35,9 @@ import (
 )
 
 type Collector struct {
-	dataDir        string
-	credentialsDir string
-	once           sync.Once
-}
-
-type VMValidation struct {
-	Result []vspheremodel.Concern `json:"result"`
+	dataDir           string
+	PersistentDataDir string
+	once              sync.Once
 }
 
 var vendorMap = map[string]string{
@@ -60,10 +56,10 @@ var vendorMap = map[string]string{
 	"LENOVO":   "Lenovo",
 }
 
-func NewCollector(dataDir string, credentialsDir string) *Collector {
+func NewCollector(dataDir string, PersistentDataDir string) *Collector {
 	return &Collector{
-		dataDir:        dataDir,
-		credentialsDir: credentialsDir,
+		dataDir:           dataDir,
+		PersistentDataDir: PersistentDataDir,
 	}
 }
 
@@ -75,19 +71,15 @@ func (c *Collector) Collect(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				default:
-					c.run()
-					if c.getOpaServerStatus() {
-						return
-					}
-					c.waitUntilOpaIsRunning()
+					c.run(ctx)
 				}
 			}
 		}()
 	})
 }
 
-func (c *Collector) run() {
-	credentialsFilePath := filepath.Join(c.credentialsDir, config.CredentialsFile)
+func (c *Collector) run(ctx context.Context) {
+	credentialsFilePath := filepath.Join(c.PersistentDataDir, config.CredentialsFile)
 	zap.S().Named("collector").Infof("Waiting for credentials")
 	waitForFile(credentialsFilePath)
 
@@ -178,15 +170,16 @@ func (c *Collector) run() {
 	}
 	inv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
 
-	opaServerAlive := c.getOpaServerStatus()
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	if opaServerAlive {
-		zap.S().Named("collector").Infof("Run the validation of VMs")
-		vms, err = Validation(vms, opaServer)
-		if err != nil {
-			zap.S().Named("collector").Errorf("failed to run validation: %v", err)
-			return
-		}
+	zap.S().Named("collector").Infof("Run the validation of VMs")
+	v, err := validator.DefaultAgentValidator()
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to initial validator: %v", err)
+		return
+	}
+
+	*vms, err = v.Validate(ctx, vms)
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to validate VMs: %v", err)
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
@@ -710,65 +703,6 @@ func createOuput(outputFile string, inv *apiplanner.Inventory) error {
 	return nil
 }
 
-func Validation(vms *[]vspheremodel.VM, opaServer string) (*[]vspheremodel.VM, error) {
-	res := []vspheremodel.VM{}
-	for _, vm := range *vms {
-		// Prepare the JSON data to MTV OPA server format.
-		r := web.Workload{}
-		r.With(&vm)
-		vmJson := map[string]interface{}{
-			"input": r,
-		}
-
-		vmData, err := json.Marshal(vmJson)
-		if err != nil {
-			return nil, err
-		}
-
-		// Prepare the HTTP request to OPA server
-		req, err := http.NewRequest(
-			"POST",
-			fmt.Sprintf("http://%s/v1/data/io/konveyor/forklift/vmware/concerns", opaServer),
-			bytes.NewBuffer(vmData),
-		)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		// Send the HTTP request to OPA server
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-
-		// Check the response status
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("invalid status code")
-		}
-
-		// Read the response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		// Save the report to map
-		var vmValidation VMValidation
-		err = json.Unmarshal(body, &vmValidation)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range vmValidation.Result {
-			vm.Concerns = append(vm.Concerns, vspheremodel.Concern{Id: c.Id, Label: c.Label, Assessment: c.Assessment, Category: c.Category})
-		}
-		resp.Body.Close()
-		res = append(res, vm)
-	}
-	return &res, nil
-}
-
 func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) (bool, bool) {
 	migratable := true
 	hasWarning := false
@@ -825,27 +759,5 @@ func waitForFile(filename string) {
 		} else {
 			return
 		}
-	}
-}
-
-func (c *Collector) getOpaServerStatus() bool {
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	zap.S().Named("collector").Infof("Check if opaServer is responding")
-	resp, err := http.Get("http://" + opaServer + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		zap.S().Named("collector").Errorf("OPA server %s is not responding", opaServer)
-		return false
-	}
-	defer resp.Body.Close()
-	zap.S().Named("collector").Infof("OPA server %s is alive", opaServer)
-	return true
-}
-
-func (c *Collector) waitUntilOpaIsRunning() {
-	for {
-		if c.getOpaServerStatus() {
-			break
-		}
-		time.Sleep(2 * time.Second)
 	}
 }

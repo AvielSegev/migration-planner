@@ -178,9 +178,9 @@ func TestValidator_ValidateConcerns_WithConcern(t *testing.T) {
 		"name": "test-vm-with-concern",
 	}
 
-	concerns, err := validator.ValidateConcerns(context.Background(), vmInput)
+	concerns, err := validator.concerns(context.Background(), vmInput)
 	if err != nil {
-		t.Fatalf("ValidateConcerns() failed: %v", err)
+		t.Fatalf("concerns() failed: %v", err)
 	}
 
 	if len(concerns) != 1 {
@@ -203,9 +203,9 @@ func TestValidator_ValidateConcerns_WithoutConcern(t *testing.T) {
 		"name": "clean-vm",
 	}
 
-	concerns, err := validator.ValidateConcerns(context.Background(), vmInput)
+	concerns, err := validator.concerns(context.Background(), vmInput)
 	if err != nil {
-		t.Fatalf("ValidateConcerns() failed: %v", err)
+		t.Fatalf("concerns() failed: %v", err)
 	}
 
 	if len(concerns) != 0 {

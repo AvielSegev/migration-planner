@@ -7,24 +7,31 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/rego"
 	"go.uber.org/zap"
 )
 
-// Handle policy discovery and file reading
+const (
+	defaultPoliciesDir = "/app/policies"
+)
+
+// PolicyReader Handle policy discovery and file reading
 type PolicyReader struct{}
 
 func NewPolicyReader() *PolicyReader {
 	return &PolicyReader{}
 }
 
-// Find the policies directory using OPA_POLICIES_DIR environment variable
+// DiscoverPoliciesDirectory Find the policies directory using OPA_POLICIES_DIR environment variable
 func (pr *PolicyReader) DiscoverPoliciesDirectory() string {
 	logger := zap.S().Named("opa")
 
-	policiesDir := util.GetEnv("OPA_POLICIES_DIR", "/app/policies")
+	policiesDir := util.GetEnv("OPA_POLICIES_DIR", defaultPoliciesDir)
 
 	if isPoliciesDirectory(policiesDir) {
 		logger.Infof("Found policies directory: %s", policiesDir)
@@ -37,7 +44,7 @@ func (pr *PolicyReader) DiscoverPoliciesDirectory() string {
 	return ""
 }
 
-// Read all .rego policy files from the specified directory
+// ReadPolicies Read all .rego policy files from the specified directory
 func (pr *PolicyReader) ReadPolicies(policiesDir string) (map[string]string, error) {
 	if !isPoliciesDirectory(policiesDir) {
 		return nil, fmt.Errorf("policies directory does not exist or contains no .rego files: %s", policiesDir)
@@ -94,7 +101,7 @@ func NewValidator(policies map[string]string) (*Validator, error) {
 	return validator, nil
 }
 
-// Compile the provided policy content and prepares the query
+// compilePolicies Compile the provided policy content and prepares the query
 func (v *Validator) compilePolicies(policies map[string]string) error {
 	compiler := ast.NewCompiler()
 	modules := make(map[string]*ast.Module)
@@ -132,8 +139,8 @@ func (v *Validator) compilePolicies(policies map[string]string) error {
 	return nil
 }
 
-// Validate the provided input against compiled policies
-func (v *Validator) ValidateConcerns(ctx context.Context, input interface{}) ([]interface{}, error) {
+// concerns Validate the provided input against compiled policies
+func (v *Validator) concerns(ctx context.Context, input interface{}) ([]interface{}, error) {
 	resultSet, err := v.preparedQuery.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
 		return nil, fmt.Errorf("policy evaluation failed: %w", err)
@@ -150,6 +157,57 @@ func (v *Validator) ValidateConcerns(ctx context.Context, input interface{}) ([]
 	}
 
 	return result, nil
+}
+
+func (v *Validator) ValidateVMs(ctx context.Context, vms []vsphere.VM) ([]vsphere.VM, error) {
+
+	validatedVMs := make([]vsphere.VM, 0, len(vms))
+
+	for _, vm := range vms {
+		// Prepare the JSON data in MTV OPA server format
+		workload := web.Workload{}
+		workload.With(&vm)
+
+		concerns, err := v.concerns(ctx, workload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate: %w", err)
+		}
+
+		// Convert concerns to vsphere.Concern format
+		for _, c := range concerns {
+			concernMap, ok := c.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf(
+					"unexpected concern data type for VM %q: got %T, expected map[string]interface{}",
+					vm.Name,
+					c,
+				)
+			}
+
+			concern := vsphere.Concern{}
+			if id, ok := concernMap["id"].(string); ok {
+				concern.Id = id
+			}
+
+			if label, ok := concernMap["label"].(string); ok {
+				concern.Label = label
+			}
+
+			if assessment, ok := concernMap["assessment"].(string); ok {
+				concern.Assessment = assessment
+			}
+
+			if category, ok := concernMap["category"].(string); ok {
+				concern.Category = category
+			}
+
+			vm.Concerns = append(vm.Concerns, concern)
+		}
+
+		validatedVMs = append(validatedVMs, vm)
+	}
+
+	return validatedVMs, nil
 }
 
 func SetupValidator() (*Validator, error) {
