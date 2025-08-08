@@ -121,6 +121,10 @@ func calculateClustersPerDatacenter(datacenterToClusters map[string]map[string]s
 	return clustersPerDatacenter
 }
 
+func calculateVmsPerCluster() map[string]int {
+	return nil
+}
+
 func groupRowsByVM(rows [][]string, colMap map[string]int) map[string][][]string {
 	vmData := make(map[string][][]string)
 

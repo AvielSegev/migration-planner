@@ -116,6 +116,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		TotalHosts:            clusterInfo.TotalHosts,
 		TotalClusters:         clusterInfo.TotalClusters,
 		TotalDatacenters:      clusterInfo.TotalDatacenters,
+		VmsPerCluster:         clusterInfo.VmsPerCluster,
 	}
 	inventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
@@ -130,6 +131,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 type ClusterInfo struct {
 	HostsPerCluster       []int
 	ClustersPerDatacenter []int
+	VmsPerCluster         map[string]int
 	TotalHosts            int
 	TotalClusters         int
 	TotalDatacenters      int
@@ -181,6 +183,7 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	return ClusterInfo{
 		HostsPerCluster:       calculateHostsPerCluster(clusterToHosts),
 		ClustersPerDatacenter: calculateClustersPerDatacenter(datacenterToClusters),
+		VmsPerCluster:         calculateVmsPerCluster(),
 		TotalHosts:            len(hosts),
 		TotalClusters:         len(clusters),
 		TotalDatacenters:      len(datacenters),
