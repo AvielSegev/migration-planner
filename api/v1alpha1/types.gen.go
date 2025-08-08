@@ -99,15 +99,16 @@ type Host struct {
 
 // Infra defines model for Infra.
 type Infra struct {
-	ClustersPerDatacenter *[]int         `json:"clustersPerDatacenter,omitempty"`
-	Datastores            []Datastore    `json:"datastores"`
-	HostPowerStates       map[string]int `json:"hostPowerStates"`
-	Hosts                 *[]Host        `json:"hosts,omitempty"`
-	HostsPerCluster       []int          `json:"hostsPerCluster"`
-	Networks              []Network      `json:"networks"`
-	TotalClusters         int            `json:"totalClusters"`
-	TotalDatacenters      *int           `json:"totalDatacenters,omitempty"`
-	TotalHosts            int            `json:"totalHosts"`
+	ClustersPerDatacenter *[]int          `json:"clustersPerDatacenter,omitempty"`
+	Datastores            []Datastore     `json:"datastores"`
+	HostPowerStates       map[string]int  `json:"hostPowerStates"`
+	Hosts                 *[]Host         `json:"hosts,omitempty"`
+	HostsPerCluster       []int           `json:"hostsPerCluster"`
+	Networks              []Network       `json:"networks"`
+	TotalClusters         int             `json:"totalClusters"`
+	TotalDatacenters      *int            `json:"totalDatacenters,omitempty"`
+	TotalHosts            int             `json:"totalHosts"`
+	VmsPerCluster         *map[string]int `json:"vmsPerCluster,omitempty"`
 }
 
 // Inventory defines model for Inventory.

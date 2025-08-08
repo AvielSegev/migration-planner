@@ -175,6 +175,7 @@ func (c *Collector) run() {
 		TotalHosts:            len(*hosts),
 		TotalClusters:         len(*clusters),
 		TotalDatacenters:      len(*datacenters),
+		VmsPerCluster:         getVMsPerCluster(*vms, *hosts, *clusters),
 	}
 	inv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
 
@@ -520,6 +521,28 @@ func getHostsPerCluster(clusters []vspheremodel.Cluster) []int {
 		res = append(res, len(c.Hosts))
 	}
 	return res
+}
+
+func getVMsPerCluster(vms []vspheremodel.VM, hosts []vspheremodel.Host, clusters []vspheremodel.Cluster) map[string]int {
+	clusterNames := make(map[string]string, len(clusters))
+	for _, c := range clusters {
+		clusterNames[c.ID] = c.Name
+	}
+
+	hostToCluster := make(map[string]string, len(hosts))
+	for _, h := range hosts {
+		if name, ok := clusterNames[h.Cluster]; ok {
+			hostToCluster[h.ID] = name
+		}
+	}
+
+	vmsPerCluster := make(map[string]int)
+	for _, vm := range vms {
+		if clusterName, ok := hostToCluster[vm.Host]; ok {
+			vmsPerCluster[clusterName]++
+		}
+	}
+	return vmsPerCluster
 }
 
 func getHostPowerStates(hosts []vspheremodel.Host) map[string]int {

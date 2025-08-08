@@ -256,7 +256,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'     
+                $ref: '#/components/schemas/Error'
   /api/v1/sources/{id}/inventory:
     put:
       tags:
@@ -878,6 +878,10 @@ components:
         hostsPerCluster:
           type: array
           items:
+            type: integer
+        vmsPerCluster:
+          type: object
+          additionalProperties:
             type: integer
         hostPowerStates:
           type: object
