@@ -16,6 +16,15 @@ import (
 	"go.uber.org/zap"
 )
 
+type ClusterInfo struct {
+	HostsPerCluster       []int
+	HostPowerStates       map[string]int
+	ClustersPerDatacenter []int
+	TotalHosts            int
+	TotalClusters         int
+	TotalDatacenters      int
+}
+
 func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*api.Inventory, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
@@ -24,9 +33,21 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	defer excelFile.Close()
 
 	sheets := excelFile.GetSheetList()
+	if err := validateSheets(sheets, "vInfo", "vHost"); err != nil {
+		zap.S().Error("%v", err)
+		return nil, err
+	}
+
+	vInfoRows := readSheet(excelFile, sheets, "vInfo")
+	vHostRows := readSheet(excelFile, sheets, "vHost")
+	vCpuRows := readSheet(excelFile, sheets, "vCPU")
+	vMemoryRows := readSheet(excelFile, sheets, "vMemory")
+	vDiskRows := readSheet(excelFile, sheets, "vDisk")
+	vNetworkRows := readSheet(excelFile, sheets, "vNetwork")
+	dvPortRows := readSheet(excelFile, sheets, "dvPort")
 
 	var vcenterUUID string
-	vInfoRows := readSheet(excelFile, sheets, "vInfo")
+
 	if len(vInfoRows) > 1 {
 		vcenterUUID, _ = extractVCenterUUID(vInfoRows)
 	}
@@ -38,21 +59,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	}
 
 	zap.S().Named("rvtools").Infof("Process VMs")
-	var vms []vsphere.VM
-	if slices.Contains(sheets, "vInfo") {
-		vHostRows := readSheet(excelFile, sheets, "vHost")
-		vCpuRows := readSheet(excelFile, sheets, "vCPU")
-		vMemoryRows := readSheet(excelFile, sheets, "vMemory")
-		vDiskRows := readSheet(excelFile, sheets, "vDisk")
-		vNetworkRows := readSheet(excelFile, sheets, "vNetwork")
-		dvPortRows := readSheet(excelFile, sheets, "dvPort")
-
-		vms, err = processVMInfo(vInfoRows, vCpuRows, vMemoryRows, vDiskRows, vNetworkRows, vHostRows, dvPortRows, datastoreMapping)
-		if err != nil {
-			zap.S().Named("rvtools").Warnf("VM processing failed: %v", err)
-			vms = []vsphere.VM{}
-		}
-	}
+	vms := processVMInfo(vInfoRows, vCpuRows, vMemoryRows, vDiskRows, vNetworkRows, vHostRows, dvPortRows, datastoreMapping)
 
 	zap.S().Named("rvtools").Infof("Validate VMs against OPA")
 	if len(vms) > 0 {
@@ -63,15 +70,10 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	}
 
 	zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
-	var hostPowerStates map[string]int
 
-	hostPowerStates = map[string]int{"green": 0}
-
-	vHostRows := readSheet(excelFile, sheets, "vHost")
 	var clusterInfo ClusterInfo
 	if len(vHostRows) > 0 {
-		clusterInfo = extractClusterAndDatacenterInfo(vHostRows)
-		hostPowerStates = extractHostPowerStates(vHostRows)
+		clusterInfo = extractFromVHost(vHostRows)
 	} else {
 		zap.S().Named("rvtools").Infof("vHost sheet not found, using default values")
 		clusterInfo = ClusterInfo{}
@@ -108,7 +110,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	infraData := service.InfrastructureData{
 		Datastores:            datastores,
 		Networks:              networks,
-		HostPowerStates:       hostPowerStates,
+		HostPowerStates:       clusterInfo.HostPowerStates,
 		Hosts:                 &[]api.Host{}, // RVTools doesn't provide detailed host info
 		HostsPerCluster:       clusterInfo.HostsPerCluster,
 		ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
@@ -127,15 +129,24 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	return inventory, nil
 }
 
-type ClusterInfo struct {
-	HostsPerCluster       []int
-	ClustersPerDatacenter []int
-	TotalHosts            int
-	TotalClusters         int
-	TotalDatacenters      int
+// validateSheets ensures that all required sheets exist before processing.
+func validateSheets(sheets []string, required ...string) error {
+	var missingSheets []string
+
+	for _, req := range required {
+		if !slices.Contains(sheets, req) {
+			missingSheets = append(missingSheets, req)
+		}
+	}
+
+	if len(missingSheets) > 0 {
+		return fmt.Errorf("missing required sheets: %v", missingSheets)
+	}
+
+	return nil
 }
 
-func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
+func extractFromVHost(vHostRows [][]string) ClusterInfo {
 	if len(vHostRows) <= 1 {
 		return ClusterInfo{}
 	}
@@ -145,6 +156,7 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	hosts := make(map[string]struct{})
 	clusters := make(map[string]struct{})
 	datacenters := make(map[string]struct{})
+	hostPowerStates := map[string]int{}
 
 	datacenterToClusters := make(map[string]map[string]struct{})
 	clusterToHosts := make(map[string]map[string]struct{})
@@ -161,6 +173,7 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 
 		datacenter := getColumnValue(row, colMap, "datacenter")
 		cluster := getColumnValue(row, colMap, "cluster")
+		status := getColumnValue(row, colMap, "config status")
 
 		hosts[host] = struct{}{}
 
@@ -177,41 +190,23 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 			clusterToHosts[cluster][host] = struct{}{}
 		}
 
-	}
-
-	return ClusterInfo{
-		HostsPerCluster:       calculateHostsPerCluster(clusterToHosts),
-		ClustersPerDatacenter: calculateClustersPerDatacenter(datacenterToClusters),
-		TotalHosts:            len(hosts),
-		TotalClusters:         len(clusters),
-		TotalDatacenters:      len(datacenters),
-	}
-}
-
-func extractHostPowerStates(rows [][]string) map[string]int {
-	if len(rows) <= 1 {
-		return map[string]int{}
-	}
-
-	colMap := buildColumnMap(rows[0])
-	hostPowerStates := map[string]int{}
-
-	for _, row := range rows[1:] {
-		if len(row) == 0 {
-			continue
-		}
-
-		status := getColumnValue(row, colMap, "config status")
-
 		switch status {
 		case "red", "yellow", "green", "gray":
 			hostPowerStates[status]++
 		default:
 			hostPowerStates["green"]++
 		}
+
 	}
 
-	return hostPowerStates
+	return ClusterInfo{
+		HostsPerCluster:       calculateHostsPerCluster(clusterToHosts),
+		HostPowerStates:       hostPowerStates,
+		ClustersPerDatacenter: calculateClustersPerDatacenter(datacenterToClusters),
+		TotalHosts:            len(hosts),
+		TotalClusters:         len(clusters),
+		TotalDatacenters:      len(datacenters),
+	}
 }
 
 func extractVmsPerCluster(rows [][]string) []int {
