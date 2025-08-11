@@ -356,7 +356,7 @@ build-no-rhcos:
 unit-test: build-no-rhcos kill-db deploy-db migrate test kill-db
 
 # Run integration tests using ginkgo
-integration-test: $(GINKGO) build
+integration-test: $(GINKGO)
 	@echo "🧪 Running integration tests..."
 	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
 	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \

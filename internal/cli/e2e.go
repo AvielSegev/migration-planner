@@ -155,9 +155,10 @@ func (o *E2ETestOptions) configureEnvironment() (map[string]string, error) {
 		"MIGRATION_PLANNER_AGENT_IMAGE":           o.agentImage,
 		"MIGRATION_PLANNER_API_IMAGE":             o.plannerAPIImage,
 		"MIGRATION_PLANNER_API_IMAGE_PULL_POLICY": o.plannerAPIImagePullPolicy,
-		"PODMAN":      o.containerRuntime,
-		"PKG_MANAGER": o.pkgManager,
-		"IFACE":       o.iface,
+		"PODMAN":         o.containerRuntime,
+		"PKG_MANAGER":    o.pkgManager,
+		"IFACE":          o.iface,
+		"DOWNLOAD_RHCOS": "false",
 	}
 
 	for key, value := range envVars {

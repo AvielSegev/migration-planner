@@ -11,9 +11,9 @@ import (
 func processVMInfo(
 	vInfoRows, vCpuRows, vMemoryRows, vDiskRows, vNetworkRows, vHostRows, dvPortRows [][]string,
 	datastoreMapping map[string]string,
-) ([]vsphere.VM, error) {
+) []vsphere.VM {
 	if len(vInfoRows) <= 1 {
-		return nil, nil
+		return []vsphere.VM{}
 	}
 
 	vCpuHeader, vCpuData := splitSheet(vCpuRows)
@@ -70,7 +70,7 @@ func processVMInfo(
 		vms = append(vms, vm)
 	}
 
-	return vms, nil
+	return vms
 }
 
 func populateVMInfoData(vm *vsphere.VM, row []string, colMap map[string]int, hostIPToObjectID map[string]string) {
