@@ -2,6 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"github.com/kubev2v/migration-planner/internal/api_server/isoserver"
+	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/spf13/pflag"
+	"go.uber.org/zap/zapcore"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,50 +14,82 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/iso"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
-var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize RHCOS ISO for the migration planner",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		defer zap.S().Info("ISO initialization completed")
+type InitOptions struct {
+	Serve bool
+	Port  string
+}
 
-		cfg, err := config.New()
-		if err != nil {
-			zap.S().Fatalw("reading configuration", "error", err)
-		}
+func DefaultInitOptions() *InitOptions {
+	return &InitOptions{
+		Serve: false,
+	}
+}
 
-		logLvl, err := zap.ParseAtomicLevel(cfg.Service.LogLevel)
-		if err != nil {
-			logLvl = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-		}
+func NewCmdInit() *cobra.Command {
+	o := DefaultInitOptions()
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Initialize RHCOS ISO for the migration planner",
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		logger := log.InitLog(logLvl)
-		defer func() { _ = logger.Sync() }()
+			defer zap.S().Info("ISO initialization completed")
 
-		undo := zap.ReplaceGlobals(logger)
-		defer undo()
+			cfg, err := config.New()
+			if err != nil {
+				zap.S().Fatalw("reading configuration", "error", err)
+			}
 
-		zap.S().Info("Starting ISO initialization...")
+			logLvl, err := zap.ParseAtomicLevel(cfg.Service.LogLevel)
+			if err != nil {
+				logLvl = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+			}
 
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
-		defer cancel()
+			logger := log.InitLog(logLvl)
+			defer func() { _ = logger.Sync() }()
 
-		// Initialize ISOs
-		zap.S().Info("Initializing RHCOS ISO")
-		isoInitializer := newIsoInitializer(cfg)
-		targetIsoFile := util.GetEnv("MIGRATION_PLANNER_ISO_PATH", "rhcos-live-iso.x86_64.iso")
-		if err := isoInitializer.Initialize(ctx, targetIsoFile, cfg.Service.RhcosImageSha256); err != nil {
-			zap.S().Fatalw("failed to initialize iso", "error", err)
-		}
-		zap.S().Info("RHCOS ISO initialized successfully")
+			undo := zap.ReplaceGlobals(logger)
+			defer undo()
 
-		return nil
-	},
+			zap.S().Info("Starting ISO initialization...")
+
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
+			defer cancel()
+
+			// Initialize ISOs
+			zap.S().Info("Initializing RHCOS ISO")
+			isoInitializer := newIsoInitializer(cfg)
+			targetIsoFile := util.GetEnv("MIGRATION_PLANNER_ISO_PATH", "rhcos-live-iso.x86_64.iso")
+			if err := isoInitializer.Initialize(ctx, targetIsoFile, cfg.Service.RhcosImageSha256); err != nil {
+				zap.S().Fatalw("failed to initialize iso", "error", err)
+			}
+			zap.S().Info("RHCOS ISO initialized successfully")
+
+			if o.Serve {
+				addr := fmt.Sprintf("0.0.0.0:%s", o.Port)
+				listener, err := newListener(addr)
+				if err != nil {
+					zap.S().Named("iso_server").Fatalw("creating listener", "error", err)
+				}
+				isoServer := isoserver.New(listener, addr, targetIsoFile)
+				if err := isoServer.Run(ctx); err != nil {
+					zap.S().Named("iso_server").Fatalw("failed to run iso server", "error", err)
+				}
+			}
+
+			return nil
+		},
+	}
+	o.Bind(cmd.Flags())
+	return cmd
+}
+
+func (o *InitOptions) Bind(fs *pflag.FlagSet) {
+	fs.BoolVar(&o.Serve, "listen", false, "listen to serve the iso file")
+	fs.StringVarP(&o.Port, "port", "p", "8080", "Port to listen on")
 }
 
 func newIsoInitializer(cfg *config.Config) *iso.IsoInitializer {

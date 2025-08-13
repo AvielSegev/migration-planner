@@ -166,20 +166,19 @@ func initializeIso(ctx context.Context, cfg *config.Config) error {
 
 	md := iso.NewDownloaderManager()
 
-	minio, err := iso.NewMinioDownloader(
-		iso.WithEndpoint(cfg.Service.S3.Endpoint),
-		iso.WithBucket(cfg.Service.S3.Bucket),
-		iso.WithAccessKey(cfg.Service.S3.AccessKey),
-		iso.WithSecretKey(cfg.Service.S3.SecretKey),
-		iso.WithImage(cfg.Service.S3.IsoFileName, cfg.Service.RhcosImageSha256),
+	isoServerDownloader := iso.NewIsoServerDownloader(
+		cfg.Service.IsoServerURL,
+		cfg.Service.RhcosImageSha256,
 	)
-	if err == nil {
-		md.Register(minio)
+
+	if err := isoServerDownloader.HealthCheck(ctx); err == nil {
+		md.Register(isoServerDownloader)
+		zap.S().Infow("Registered ISO server downloader", "url", cfg.Service.IsoServerURL)
 	} else {
-		zap.S().Errorw("failed to create minio downloader", "error", err)
+		zap.S().Warnw("ISO server health check failed", "error", err, "url", cfg.Service.IsoServerURL)
 	}
 
-	// register the default downloader of the official RHCOS image.
+	// Fallback: Official RHCOS HTTP downloader
 	md.Register(iso.NewHttpDownloader(cfg.Service.RhcosImageName, cfg.Service.RhcosImageSha256))
 
 	if err := md.Download(ctx, out); err != nil {
