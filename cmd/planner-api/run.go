@@ -69,7 +69,7 @@ var runCmd = &cobra.Command{
 		}
 
 		// The migration planner API expects the RHCOS ISO to be on disk
-		if err := validateIso(cfg.Service.IsoPath); err != nil {
+		if err := ensureIsoExist(cfg.Service.IsoPath); err != nil {
 			zap.S().Fatalw("validate iso", "error", err)
 			return err
 		}
@@ -150,7 +150,7 @@ func newListener(address string) (net.Listener, error) {
 	return net.Listen("tcp", address)
 }
 
-func validateIso(path string) error {
+func ensureIsoExist(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("RHCOS ISO not found at path: %s", path)

@@ -403,12 +403,18 @@ objects:
             app: migration-planner
         spec:
           initContainers:
-            - name: pull-iso-from-quay
-              image: ghcr.io/oras-project/oras:v1.2.0
+            - name: pull-iso
+              image: quay.io/podman/stable:latest
               command: [ "sh", "-ceu" ]
               args:
                 - |
-                  oras pull "${MIGRATION_PLANNER_ISO_IMAGE}" --output /iso
+                  # Pull the OCI artifact (ISO image) from the registry into podman’s local storage
+                  podman artifact pull "${MIGRATION_PLANNER_ISO_IMAGE}"
+                  
+                  # Extract the ISO file from the pulled artifact to the desired path
+                  podman artifact extract "${MIGRATION_PLANNER_ISO_IMAGE}" "${MIGRATION_PLANNER_ISO_PATH}"
+                  
+                  # Set the correct permissions for the ISO file so it can be read by other processes
                   chmod 0644 "${MIGRATION_PLANNER_ISO_PATH}"
               volumeMounts:
                 - name: iso-storage
