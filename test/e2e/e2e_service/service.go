@@ -26,6 +26,7 @@ type PlannerService interface {
 	RemoveSource(uuid.UUID) error
 	RemoveSources() error
 	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
+	UploadRvtools(uuid.UUID) error
 	ChangeCredentials(user *auth.User) error
 }
 
@@ -216,6 +217,30 @@ func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Invent
 
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to update source with uuid: %s. "+
+			"response status code: %d", uuid.String(), res.StatusCode)
+	}
+
+	return err
+}
+
+func (s *plannerService) UploadRvtools(uuid uuid.UUID) error {
+	zap.S().Infof("[PlannerService] Upload RVtools [user: %s, organization: %s]",
+		s.credentials.Username, s.credentials.Organization)
+	update := v1alpha1.UploadRvtoolsFileMultipartBody{}
+
+	reqBody, err := json.Marshal(update)
+	if err != nil {
+		return err
+	}
+
+	res, err := s.api.PutRequest(path.Join(uuid.String(), "rvtools"), reqBody)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to Upload RVtools with uuid: %s. "+
 			"response status code: %d", uuid.String(), res.StatusCode)
 	}
 
