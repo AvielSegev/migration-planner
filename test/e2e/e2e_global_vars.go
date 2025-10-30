@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,6 +19,7 @@ const (
 	VmName              = "coreos-vm"
 	Vsphere1Port        = "8989"
 	Vsphere2Port        = "8990"
+	AgentPort           = 3333
 )
 
 var (
@@ -30,4 +32,13 @@ var (
 	PrivateKeyPath     = filepath.Join(os.Getenv("E2E_PRIVATE_KEY_FOLDER_PATH"), "private-key")
 	SystemIP           = os.Getenv("PLANNER_IP")
 	TestsExecutionTime = make(map[string]time.Duration)
+)
+
+// Using agent as containers
+var (
+	AgentImagePath             = fmt.Sprintf("%s:5000/agent:latest", SystemIP)
+	AgentDestDataDir           = "/app/.migration-planner/data"
+	AgentDestPersistentDataDir = "/app/.migration-planner/persistent-data"
+	AgentDestConfigDir         = "/app/.migration-planner/config"
+	MountBasePath              = fmt.Sprintf("/tmp/agent-e2e-%s", uuid.New())
 )
