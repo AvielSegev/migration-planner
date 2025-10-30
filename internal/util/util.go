@@ -51,6 +51,10 @@ func (duration *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
 func GetEnv(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists && len(value) > 0 {
 		return value

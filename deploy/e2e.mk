@@ -2,7 +2,7 @@ E2E_PRIVATE_KEY_FOLDER_PATH ?= /etc/planner/e2e
 E2E_CLUSTER_NAME ?= kind-e2e
 
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_vcsim build_planner_api_container deploy_assisted_migration
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -11,6 +11,13 @@ install_qemu_img:
 	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
 		sudo dnf install -y qemu-img; \
 	fi
+
+.PHONY: deploy_registry
+deploy_registry: oc
+	oc create deployment registry --image=docker.io/registry
+	oc rollout status deployment/registry --timeout=60s
+	oc wait --for=condition=Ready pods --all --timeout=240s
+	oc port-forward --address 0.0.0.0 deploy/registry 5000:5000 > /dev/null 2>&1 &
 
 .PHONY: ignore_insecure_registry
 ignore_insecure_registry:
@@ -61,9 +68,11 @@ deploy_vcsim: oc
 	oc port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 > /dev/null 2>&1 &
 	oc port-forward --address 0.0.0.0 deploy/vcsim2 8990:8990 > /dev/null 2>&1 &
 
-.PHONY: build_planner_api_container
-build_planner_api_container:
+.PHONY: build_assisted_migration_containers
+build_assisted_migration_containers:
+	make migration-planner-agent-container
 	make migration-planner-api-container
+	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE)
 	kind load docker-image $(MIGRATION_PLANNER_API_IMAGE) --name $(E2E_CLUSTER_NAME)
 	$(PODMAN) rmi $(MIGRATION_PLANNER_API_IMAGE)
 
@@ -73,6 +82,7 @@ deploy_assisted_migration: oc
 	oc wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
 	oc port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &
+	oc port-forward --address 0.0.0.0 service/migration-planner-postgres 5432:5432 > /dev/null 2>&1 &
 
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:

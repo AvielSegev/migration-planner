@@ -1,13 +1,61 @@
 package utils
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/store"
 	"os"
 
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/cli"
 	. "github.com/kubev2v/migration-planner/test/e2e"
 )
+
+func GetAgentToken(ctx context.Context, sourceID uuid.UUID) (string, error) {
+	cfg, err := config.New()
+	if err != nil {
+		return "", err
+	}
+
+	db, err := store.InitDB(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	storeInstance := store.NewStore(db)
+	defer storeInstance.Close()
+
+	source, err := storeInstance.Source().Get(ctx, sourceID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get source: %v", err)
+	}
+
+	key, err := storeInstance.PrivateKey().Get(ctx, source.OrgID)
+	if err != nil {
+		if !errors.Is(err, store.ErrRecordNotFound) {
+			return "", err
+		}
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
+		if err != nil {
+			return "", err
+		}
+		if _, err := storeInstance.PrivateKey().Create(ctx, *newKey); err != nil {
+			return "", err
+		}
+
+		return token, nil
+	}
+
+	token, err := auth.GenerateAgentJWT(key, source)
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
 
 // GetToken retrieves the private key from the specified path, parses it, and then generates a token
 // for the given credentials using the private key. Returns the token or an error.
