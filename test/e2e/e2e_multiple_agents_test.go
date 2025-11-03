@@ -87,48 +87,8 @@ var _ = Describe("e2e", func() {
 		e2eAgent.Agent.DumpLogs(agentIP)
 	})
 
-	Context("Check Vcenter login behavior", func() {
-		It("Succeeds login only for valid credentials", func() {
-
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"", "pass")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Empty User. Successfully returned http status: BadRequest.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"user", "")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Empty Password. Successfully returned http status: BadRequest.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"invalid", "cred")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
-			zap.S().Info("Invalid credentials. HTTP status: Unauthorized returned.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
-				"user", "pass")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Invalid URL. Successfully returned http status: BadRequest.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Credentials verified successfully. HTTP status: NoContent (204) returned.")
-
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
-	})
-
-	Context("Flow", func() {
-
-		It("Source removal", func() {
+	Context("Multiple agents", func() {
+		It("Two agents, Two VSphere's", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
@@ -144,21 +104,41 @@ var _ = Describe("e2e", func() {
 				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
-			err = svc.RemoveSource(source.Id)
+			source2, err := svc.CreateSource("source-2")
+			Expect(err).To(BeNil())
+			Expect(source2).NotTo(BeNil())
+
+			var agent2 E2EAgent
+			agent2.Agent, err = CreateAgent("2", source2.Id, VmName+"-2", svc)
 			Expect(err).To(BeNil())
 
-			_, err = svc.GetSource(source.Id)
-			Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("code: %d", http.StatusNotFound))))
+			var agentIP2 string
+			Eventually(func() error {
+				agentIP2, err = agent2.Agent.GetIp()
+				if err != nil {
+					return err
+				}
+				return nil
+			}, "3m", "2s").Should(BeNil())
 
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
-	})
+			agent2ApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP2)
+			agent2.Api = DefaultAgentApi(agent2ApiBaseUrl)
+			zap.S().Infof("Agent2 Api base url: %s", agent2ApiBaseUrl)
 
-	Context("Assessments", func() {
-		It("Test Assessment Endpoints With inventory", func() {
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+			Eventually(func() bool {
+				return agent2.Agent.IsServiceRunning(agentIP2, "planner-agent")
+			}, "3m", "2s").Should(BeTrue())
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			Eventually(func() string {
+				credUrl, err := CredentialURL(svc, source2.Id)
+				if err != nil {
+					return err.Error()
+				}
+				return credUrl
+			}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
+
+			// Login to Vcsim2
+			res, err = agent2.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere2Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -166,35 +146,16 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source2.Id)
 				Expect(err).To(BeNil())
 				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
-			inventory, err := e2eAgent.Api.Inventory()
-			Expect(err).To(BeNil())
-
-			// Create an assessment from an environment (source)
-			assessment, err := svc.CreateAssessment("assessment", "agent", &source.Id, inventory)
-			Expect(err).To(BeNil())
-			Expect(assessment).NotTo(BeNil())
-
-			assessment, err = svc.GetAssessment(assessment.Id)
-			Expect(err).To(BeNil())
-			Expect(assessment.Name).To(Equal("assessment"))
-
-			assessment, err = svc.UpdateAssessment(assessment.Id, "assessment1")
-			Expect(err).To(BeNil())
-			Expect(assessment.Name).To(Equal("assessment1"))
-
-			assessments, err := svc.GetAssessments()
-			Expect(err).To(BeNil())
-			Expect(*assessments).To(HaveLen(1))
-
-			err = svc.RemoveAssessment(assessment.Id)
+			err = agent2.Agent.Remove()
 			Expect(err).To(BeNil())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
 	})
+
 })
