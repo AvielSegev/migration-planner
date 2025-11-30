@@ -124,6 +124,23 @@ bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_F
 migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
 
+bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config
+	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	ISO_CHECKSUM=$$(grep '^ISO_CHECKSUM=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	INSECURE_TLS=$${INSECURE_TLS:-false}; \
+	$(PODMAN) build . \
+		--network=host \
+		--build-arg AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) \
+		--build-arg ISO_URL=$$ISO_URL \
+		--build-arg ISO_CHECKSUM=$$ISO_CHECKSUM \
+		--build-arg FINAL_ISO_PATH=/rhcos.iso \
+		--build-arg INSECURE_TLS=$$INSECURE_TLS \
+		-f build/migration-planner-iso/Containerfile \
+		$(if $(LABEL),--label "$(LABEL)") \
+		-t $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+
+migration-planner-iso-container: bin/.migration-planner-iso-container
+
 build-containers: migration-planner-api-container migration-planner-agent-container
 
 .PHONY: build-containers
