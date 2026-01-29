@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -40,12 +41,13 @@ type StorageCustomerStats struct {
 }
 
 type InventoryStats struct {
-	Vms                                VmStats
-	Os                                 OsStats
-	TotalCustomers                     int
-	TotalAssessmentsByCustomerBySource map[string]CustomerAssessments
-	TotalInventories                   int
-	Storage                            []StorageCustomerStats
+	Vms                                         VmStats
+	Os                                          OsStats
+	TotalCustomers                              int
+	TotalAssessmentsByCustomerBySource          map[string]CustomerAssessments
+	TotalAssessmentsByCustomerBySourceLast7Days map[string]CustomerAssessments
+	TotalInventories                            int
+	Storage                                     []StorageCustomerStats
 }
 
 type domainInventory struct {
@@ -79,13 +81,16 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 		orgIDs[a.OrgID] = struct{}{}
 	}
 
+	assessmentsByCustomerBySource, assessmentsByCustomerBySourceLast7Days := computeAssessmentsByCustomerBySource(assessments)
+
 	return InventoryStats{
 		Vms:                                computeVmStats(domainInventories),
 		Os:                                 computeOsStats(domainInventories),
 		TotalInventories:                   len(domainInventories),
-		TotalAssessmentsByCustomerBySource: computeAssessmentsByCustomerBySource(assessments),
-		TotalCustomers:                     len(orgIDs),
-		Storage:                            computeStorageStats(domainInventories),
+		TotalAssessmentsByCustomerBySource: assessmentsByCustomerBySource,
+		TotalAssessmentsByCustomerBySourceLast7Days: assessmentsByCustomerBySourceLast7Days,
+		TotalCustomers: len(orgIDs),
+		Storage:        computeStorageStats(domainInventories),
 	}
 }
 
@@ -125,9 +130,11 @@ func computeOsStats(domainSnapshots []domainInventory) OsStats {
 	return OsStats{Total: len(os)}
 }
 
-func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]CustomerAssessments {
+func computeAssessmentsByCustomerBySource(assessments []Assessment) (map[string]CustomerAssessments, map[string]CustomerAssessments) {
 	assessmentsByCustomer := make(map[string]CustomerAssessments)
-
+	assessmentsByCustomerLast7Days := make(map[string]CustomerAssessments)
+	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
+	
 	for _, a := range assessments {
 		domain, err := getDomainNameFromAssessment(a)
 		if err != nil {
@@ -136,18 +143,26 @@ func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]C
 		}
 
 		customer := assessmentsByCustomer[domain]
+		customerLast7Days := assessmentsByCustomerLast7Days[domain]
 
 		switch a.SourceType {
 		case SourceTypeAgent:
 			customer.AgentCount++
+			if a.CreatedAt.After(sevenDaysAgo) {
+				customerLast7Days.AgentCount++
+			}
 		case SourceTypeRvtools:
 			customer.RvToolCount++
+			if a.CreatedAt.After(sevenDaysAgo) {
+				customerLast7Days.RvToolCount++
+			}
 		}
 
 		assessmentsByCustomer[domain] = customer
+		assessmentsByCustomerLast7Days[domain] = customerLast7Days
 	}
 
-	return assessmentsByCustomer
+	return assessmentsByCustomer, assessmentsByCustomerLast7Days
 }
 
 func computeStorageStats(domainInventories []domainInventory) []StorageCustomerStats {
