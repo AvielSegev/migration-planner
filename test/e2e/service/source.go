@@ -47,12 +47,16 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	defer res.Body.Close()
 
 	createSourceRes, err := internalclient.ParseCreateSourceResponse(res)
-	if err != nil || createSourceRes.HTTPResponse.StatusCode != http.StatusCreated {
+	if err != nil {
 		return nil, fmt.Errorf("failed to create the source: %v", err)
 	}
 
 	if createSourceRes.JSON201 == nil {
-		return nil, fmt.Errorf("failed to create the source")
+		var dest v1alpha1.Error
+		if err := json.Unmarshal(createSourceRes.Body, &dest); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("failed to create the source. error response: %s", dest.Message)
 	}
 
 	zap.S().Info("Source created successfully")

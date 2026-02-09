@@ -89,7 +89,7 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("corrupted-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			Expect(err).To(MatchError(ContainSubstring("status code: 400")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -107,7 +107,7 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("empty-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			Expect(err).To(MatchError(ContainSubstring("status code: 400")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -176,7 +176,7 @@ var _ = Describe("e2e-rvtools", func() {
 			//	assessment, err = svc.CreateAssessmentFromRvtools("", tmpFile)
 			//	Expect(err).NotTo(BeNil())
 			//	Expect(assessment).To(BeNil())
-			//	Expect(err.Error()).To(ContainSubstring("status: 400"))
+			//	Expect(err.Error()).To(ContainSubstring("status code: 400"))
 			//
 			//	// Test very long name - if validation added, would be immediate (400)
 			//	// Currently no length validation, so job would be created and might succeed or fail
@@ -185,7 +185,7 @@ var _ = Describe("e2e-rvtools", func() {
 			//	Expect(err).NotTo(BeNil())
 			//	Expect(assessment).To(BeNil())
 			//	// Update this assertion based on actual validation implementation
-			//	Expect(err.Error()).To(Or(ContainSubstring("status: 400"), ContainSubstring("job failed")))
+			//	Expect(err.Error()).To(Or(ContainSubstring("status code: 400"), ContainSubstring("job failed")))
 			//
 			//	// Test name with special characters - if validation added, would be immediate (400)
 			//	// Currently no format validation, so job would be created and might succeed or fail
@@ -193,7 +193,7 @@ var _ = Describe("e2e-rvtools", func() {
 			//	Expect(err).NotTo(BeNil())
 			//	Expect(assessment).To(BeNil())
 			//	// Update this assertion based on actual validation implementation
-			//	Expect(err).To(Or(MatchError(ContainSubstring("status: 400")), MatchError(ContainSubstring("job failed"))))
+			//	Expect(err).To(Or(MatchError(ContainSubstring("status code: 400")), MatchError(ContainSubstring("job failed"))))
 			//
 			//	zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			//})
