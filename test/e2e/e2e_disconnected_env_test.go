@@ -2,7 +2,6 @@ package e2e_test
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/kubev2v/migration-planner/test/e2e/model"
@@ -100,22 +99,30 @@ var _ = Describe("e2e-disconnected-environment", func() {
 				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", SystemIP))
 			Expect(err).To(BeNil(), "Failed to enable connection to Vsphere")
 
-			// Login to Vcenter
-			Eventually(func() bool {
-				res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
-					"core", "123456")
-				return err == nil && res.StatusCode == http.StatusNoContent
-			}, "3m", "2s").Should(BeTrue())
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			s, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port), "core", "123456")
+			Expect(err).To(BeNil())
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
 
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				statusReply, err := e2eAgent.Api.Status()
+				s, err = e2eAgent.Api.GetCollectorStatus()
 				if err != nil {
 					return false
 				}
-				Expect(statusReply.Connected).Should(Equal("false"))
-				return statusReply.Connected == "false" && statusReply.Status == string(v1alpha1.AgentStatusUpToDate)
+				return s.Status == string(CollectorStatusCollected)
+			}, "3m", "2s").Should(BeTrue())
+
+			statusReply, err := e2eAgent.Api.Status()
+			Expect(err).To(BeNil())
+			Expect(statusReply.ConsoleConnection).To(Equal("disconnected"))
+
+			// Todo: status should probably be collected
+			zap.S().Infof("Wait for collecor status to be %s...", string(CollectorStatusCollected))
+			Eventually(func() bool {
+				collectorStatus, err := e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return false
+				}
+				return collectorStatus.Status == string(CollectorStatusCollected)
 			}, "3m", "2s").Should(BeTrue())
 
 			// Get inventory
