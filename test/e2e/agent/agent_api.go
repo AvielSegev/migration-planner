@@ -100,10 +100,9 @@ func (a *AgentApi) Status() (*AgentStatus, error) {
 
 // Inventory retrieves the inventory data collected by the agent
 func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
-	var result struct {
-		Inventory v1alpha1.Inventory `json:"inventory"`
-	}
-	res, err := a.request(http.MethodGet, "inventory", nil, &result)
+	var inv v1alpha1.Inventory
+
+	res, err := a.request(http.MethodGet, "inventory", nil, &inv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inventory: %v", err)
 	}
@@ -112,7 +111,7 @@ func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
 		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
 	}
 
-	return &result.Inventory, nil
+	return &inv, nil
 }
 
 func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
@@ -125,7 +124,7 @@ func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
 	var status AgentStatus
 
 	res, err := a.request(http.MethodPost, "agent", data, &status)
-	if err != nil || res.StatusCode != http.StatusOK {
+	if err != nil {
 		return nil, fmt.Errorf("failed to set agent mode: %v", err)
 	}
 
@@ -136,7 +135,7 @@ func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
 	return &status, nil
 }
 
-func (a *AgentApi) StartCollector(vcenterURL, username, password string) (*CollectorStatus, error) {
+func (a *AgentApi) StartCollector(vcenterURL, username, password string) (*CollectorStatus, int, error) {
 	body := CollectorStartRequest{
 		URL:      vcenterURL,
 		Username: username,
@@ -144,21 +143,17 @@ func (a *AgentApi) StartCollector(vcenterURL, username, password string) (*Colle
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling request: %w", err)
+		return nil, 1, fmt.Errorf("marshaling request: %w", err)
 	}
 
 	var status CollectorStatus
 
 	res, err := a.request(http.MethodPost, "collector", data, &status)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start collector: %v", err)
+		return nil, 1, fmt.Errorf("failed to start collector: %v", err)
 	}
 
-	if res.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
-	}
-
-	return &status, nil
+	return &status, res.StatusCode, nil
 }
 
 func (a *AgentApi) GetCollectorStatus() (*CollectorStatus, error) {
