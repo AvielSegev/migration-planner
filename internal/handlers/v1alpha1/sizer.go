@@ -9,7 +9,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
 
 // (POST /api/v1/assessments/{id}/cluster-requirements)
@@ -25,7 +24,7 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 
 	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: "empty body"}, nil
 	}
 
 	assessmentID := request.Id
@@ -33,27 +32,27 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 
 	if clusterID == "" {
 		logger.Error(fmt.Errorf("clusterId is required")).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: "clusterId is required", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
 	// Validate worker node sizes
 	if request.Body.WorkerNodeCPU <= 0 || request.Body.WorkerNodeMemory <= 0 {
 		logger.Error(fmt.Errorf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory)).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory)}, nil
 	}
 
 	// Validate CPU overcommit ratio
 	validCpuRatios := map[string]bool{"1:1": true, "1:2": true, "1:4": true, "1:6": true}
 	if !validCpuRatios[string(request.Body.CpuOverCommitRatio)] {
 		logger.Error(fmt.Errorf("invalid CPU over-commit ratio: %s", request.Body.CpuOverCommitRatio)).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6", request.Body.CpuOverCommitRatio), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6", request.Body.CpuOverCommitRatio)}, nil
 	}
 
 	// Validate memory overcommit ratio
 	validMemoryRatios := map[string]bool{"1:1": true, "1:2": true, "1:4": true}
 	if !validMemoryRatios[string(request.Body.MemoryOverCommitRatio)] {
 		logger.Error(fmt.Errorf("invalid memory over-commit ratio: %s", request.Body.MemoryOverCommitRatio)).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4", request.Body.MemoryOverCommitRatio), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4", request.Body.MemoryOverCommitRatio)}, nil
 	}
 
 	// Validate SMT configuration if threads provided
@@ -62,8 +61,7 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		if threads < request.Body.WorkerNodeCPU {
 			logger.Error(fmt.Errorf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU)).Log()
 			return server.CalculateAssessmentClusterRequirements400JSONResponse{
-				Message:   fmt.Sprintf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU),
-				RequestId: requestid.FromContextPtr(ctx),
+				Message: fmt.Sprintf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU),
 			}, nil
 		}
 	}
@@ -73,22 +71,22 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateAssessmentClusterRequirements404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateAssessmentClusterRequirements404JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateAssessmentClusterRequirements500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateAssessmentClusterRequirements500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
 	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
 		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
 		logger.Error(fmt.Errorf("authorization failed: %s", message)).Log()
-		return server.CalculateAssessmentClusterRequirements403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements403JSONResponse{Message: message}, nil
 	}
 
 	if err := h.sizerSrv.Health(ctx); err != nil {
 		logger.Error(err).Log()
-		return server.CalculateAssessmentClusterRequirements503JSONResponse{Message: fmt.Sprintf("sizer service unavailable: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateAssessmentClusterRequirements503JSONResponse{Message: fmt.Sprintf("sizer service unavailable: %v", err)}, nil
 	}
 
 	logger.Step("cluster_requirements_calculation").
@@ -106,13 +104,13 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateAssessmentClusterRequirements404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateAssessmentClusterRequirements404JSONResponse{Message: err.Error()}, nil
 		case *service.ErrInvalidClusterInventory, *service.ErrInvalidRequest:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("cluster_id", clusterID).Log()
-			return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
-			return server.CalculateAssessmentClusterRequirements500JSONResponse{Message: fmt.Sprintf("failed to calculate cluster requirements: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateAssessmentClusterRequirements500JSONResponse{Message: fmt.Sprintf("failed to calculate cluster requirements: %v", err)}, nil
 		}
 	}
 

@@ -10,7 +10,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
 
 // (POST /api/v1/assessments/{id}/migration-estimation)
@@ -26,7 +25,7 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 
 	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).Log()
-		return server.CalculateMigrationEstimation400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateMigrationEstimation400JSONResponse{Message: "empty body"}, nil
 	}
 
 	assessmentID := request.Id
@@ -34,7 +33,7 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 
 	if clusterID == "" {
 		logger.Error(fmt.Errorf("clusterId is required")).Log()
-		return server.CalculateMigrationEstimation400JSONResponse{Message: "clusterId is required", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateMigrationEstimation400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
 	// Get assessment to verify ownership
@@ -43,17 +42,17 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		var notFound *service.ErrResourceNotFound
 		if errors.As(err, &notFound) {
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
 		}
 		logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-		return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to get assessment", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to get assessment"}, nil
 	}
 
 	// Verify user owns the assessment
 	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
 		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
 		logger.Error(fmt.Errorf("authorization failed: %s", message)).Log()
-		return server.CalculateMigrationEstimation403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateMigrationEstimation403JSONResponse{Message: message}, nil
 	}
 
 	logger.Step("calculate_estimation").
@@ -69,10 +68,10 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		var notFound *service.ErrResourceNotFound
 		if errors.As(err, &notFound) {
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
 		}
 		logger.Error(err).Log()
-		return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to calculate migration estimation", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to calculate migration estimation"}, nil
 	}
 
 	logger.Success().

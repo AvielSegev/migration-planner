@@ -211,9 +211,6 @@ type Datastore struct {
 type Error struct {
 	// Message Error message
 	Message string `json:"message"`
-
-	// RequestId Id of the request generating the error
-	RequestId *string `json:"requestId,omitempty"`
 }
 
 // EstimationDetail Detailed estimation result from a single calculator

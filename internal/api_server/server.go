@@ -151,6 +151,7 @@ func (s *Server) Run(ctx context.Context) error {
 			AllowedOrigins:   []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
 			AllowedMethods:   []string{"GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"},
 			AllowedHeaders:   []string{"*"},
+			ExposedHeaders:   []string{middleware.RequestIDHeader},
 			AllowCredentials: true,
 			MaxAge:           300,
 		}),

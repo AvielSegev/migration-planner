@@ -13,7 +13,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
 
 // (POST /api/v1/assessments/rvtools)
@@ -28,7 +27,7 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 
 	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateRVToolsAssessment400JSONResponse{Message: "empty body"}, nil
 	}
 
 	// Parse multipart form data
@@ -67,26 +66,26 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 				break
 			}
 			logger.Error(err).WithString("step", "parse_multipart").Log()
-			return server.CreateRVToolsAssessment400JSONResponse{Message: fmt.Sprintf("failed to parse form: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateRVToolsAssessment400JSONResponse{Message: fmt.Sprintf("failed to parse form: %v", err)}, nil
 		}
 
 		if err := processPart(part); err != nil {
 			logger.Error(err).WithString("step", "process_part").Log()
-			return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
 		}
 	}
 
 	if err := validator.ValidateName(name); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
 	}
 	if len(fileContent) == 0 {
 		logger.Error(fmt.Errorf("file is required")).Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: "file is required", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateRVToolsAssessment400JSONResponse{Message: "file is required"}, nil
 	}
 	if err := validator.ValidateXLSXMagicBytes(fileContent); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
 	}
 
 	logger.Step("file_read").WithInt("file_size", len(fileContent)).Log()
@@ -105,7 +104,7 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)
 	if err != nil {
 		logger.Error(err).Log()
-		return server.CreateRVToolsAssessment500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateRVToolsAssessment500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil
 	}
 
 	logger.Success().WithParam("job_id", job.Id).Log()
@@ -129,13 +128,13 @@ func (h *ServiceHandler) GetJob(ctx context.Context, request server.GetJobReques
 		switch err.(type) {
 		case *service.ErrJobNotFound:
 			logger.Error(err).Log()
-			return server.GetJob404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.GetJob404JSONResponse{Message: err.Error()}, nil
 		case *service.ErrJobForbidden:
 			logger.Error(err).Log()
-			return server.GetJob403JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.GetJob403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
-			return server.GetJob500JSONResponse{Message: fmt.Sprintf("failed to get job: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.GetJob500JSONResponse{Message: fmt.Sprintf("failed to get job: %v", err)}, nil
 		}
 	}
 
@@ -160,13 +159,13 @@ func (h *ServiceHandler) CancelJob(ctx context.Context, request server.CancelJob
 		switch err.(type) {
 		case *service.ErrJobNotFound:
 			logger.Error(err).Log()
-			return server.CancelJob404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CancelJob404JSONResponse{Message: err.Error()}, nil
 		case *service.ErrJobForbidden:
 			logger.Error(err).Log()
-			return server.CancelJob403JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CancelJob403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
-			return server.CancelJob500JSONResponse{Message: fmt.Sprintf("failed to cancel job: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CancelJob500JSONResponse{Message: fmt.Sprintf("failed to cancel job: %v", err)}, nil
 		}
 	}
 

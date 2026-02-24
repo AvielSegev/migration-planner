@@ -11,7 +11,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
 
 // (GET /api/v1/assessments)
@@ -36,14 +35,14 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
 		logger.Error(err).Log()
-		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
 	}
 
 	logger.Success().WithInt("count", len(assessments)).Log()
 
 	apiAssessments, err := mappers.AssessmentListToApi(assessments)
 	if err != nil {
-		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
 	}
 
 	return server.ListAssessments200JSONResponse(apiAssessments), nil
@@ -62,13 +61,13 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 
 	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).Log()
-		return server.CreateAssessment400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateAssessment400JSONResponse{Message: "empty body"}, nil
 	}
 
 	form := v1alpha1.AssessmentForm(*request.Body)
 	if err := validateAssessmentData(form); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
 	}
 
 	createForm := mappers.AssessmentFormToCreateForm(form, user)
@@ -87,19 +86,19 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		switch err.(type) {
 		case *service.ErrAssessmentCreationForbidden:
 			logger.Error(err).WithString("step", "authorization").Log()
-			return server.CreateAssessment401JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment401JSONResponse{Message: err.Error()}, nil
 		case *service.ErrSourceHasNoInventory:
 			logger.Error(err).WithString("step", "inventory_check").Log()
-			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
 		case *service.ErrInventoryHasNoVMs:
 			logger.Error(err).WithString("step", "inventory_validation").Log()
-			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
 		case *service.ErrDuplicateKey:
 			logger.Error(err).WithString("step", "validate_input").Log()
-			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
-			return server.CreateAssessment500JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment500JSONResponse{Message: err.Error()}, nil
 		}
 	}
 
@@ -111,7 +110,7 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 
 	apiAssessment, err := mappers.AssessmentToApi(*assessment)
 	if err != nil {
-		return server.CreateAssessment500JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.CreateAssessment500JSONResponse{Message: err.Error()}, nil
 	}
 
 	return server.CreateAssessment201JSONResponse(apiAssessment), nil
@@ -132,10 +131,10 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.GetAssessment404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.GetAssessment404JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
@@ -145,7 +144,7 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
 		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
 		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("user", user.Username).WithString("assessment_username", assessment.Username).Log()
-		return server.GetAssessment403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.GetAssessment403JSONResponse{Message: message}, nil
 	}
 
 	logger.Step("authorization_check_passed").Log()
@@ -153,7 +152,7 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 
 	apiAssessment, err := mappers.AssessmentToApi(*assessment)
 	if err != nil {
-		return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 	}
 
 	return server.GetAssessment200JSONResponse(apiAssessment), nil
@@ -173,7 +172,7 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 
 	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).WithUUID("assessment_id", request.Id).Log()
-		return server.UpdateAssessment400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.UpdateAssessment400JSONResponse{Message: "empty body"}, nil
 	}
 
 	assessmentID := request.Id
@@ -184,10 +183,10 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_update").Log()
-			return server.UpdateAssessment404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.UpdateAssessment404JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_update").Log()
-			return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
@@ -196,7 +195,7 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
 		message := fmt.Sprintf("forbidden to update assessment %s by user %s", assessmentID, user.Username)
 		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("username", user.Username).WithString("assessment_username", assessment.Username).Log()
-		return server.UpdateAssessment403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.UpdateAssessment403JSONResponse{Message: message}, nil
 	}
 
 	logger.Step("authorization_check_passed").Log()
@@ -206,13 +205,13 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.UpdateAssessment404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.UpdateAssessment404JSONResponse{Message: err.Error()}, nil
 		case *service.ErrAgentUpdateForbidden:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.UpdateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.UpdateAssessment400JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err)}, nil
 		}
 	}
 
@@ -223,7 +222,7 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 
 	apiAssessment, err := mappers.AssessmentToApi(*updatedAssessment)
 	if err != nil {
-		return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err)}, nil
 	}
 
 	return server.UpdateAssessment200JSONResponse(apiAssessment), nil
@@ -248,10 +247,10 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_delete").Log()
-			return server.DeleteAssessment404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.DeleteAssessment404JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_delete").Log()
-			return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
@@ -260,14 +259,14 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
 		message := fmt.Sprintf("forbidden to delete assessment %s by user with %s", assessmentID, user.Username)
 		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("username", user.Username).WithString("assessment_username", assessment.Username).Log()
-		return server.DeleteAssessment403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.DeleteAssessment403JSONResponse{Message: message}, nil
 	}
 
 	logger.Step("authorization_check_passed").Log()
 
 	if err := h.assessmentSrv.DeleteAssessment(ctx, assessmentID); err != nil {
 		logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-		return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to delete assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+		return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to delete assessment: %v", err)}, nil
 	}
 
 	logger.Success().WithString("deleted_assessment_name", assessment.Name).Log()

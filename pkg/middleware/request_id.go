@@ -7,6 +7,8 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
 
+const RequestIDHeader = "X-Request-ID"
+
 // RequestID gets the request ID from the x-request-id header or generates
 // a unique request ID for each HTTP request and injects it into the
 // request's context.Context for consistent access across the application layer.
@@ -15,7 +17,7 @@ import (
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// First try to get request ID from x-request-id header
-		requestID := r.Header.Get("x-request-id")
+		requestID := r.Header.Get(RequestIDHeader)
 
 		// If no header provided, check if Chi already generated one
 		if requestID == "" {
@@ -31,6 +33,7 @@ func RequestID(next http.Handler) http.Handler {
 		ctx := requestid.ToContext(r.Context(), requestID)
 		r = r.WithContext(ctx)
 
+		w.Header().Set(RequestIDHeader, requestID)
 		next.ServeHTTP(w, r)
 	})
 }
