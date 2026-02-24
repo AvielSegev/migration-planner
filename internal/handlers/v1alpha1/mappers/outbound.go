@@ -323,17 +323,17 @@ func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsRespon
 }
 
 // MigrationEstimationResultToAPI converts service MigrationAssessmentResult to API response
-func MigrationEstimationResultToAPI(result service.MigrationAssessmentResult) v1alpha1.MigrationEstimationResponse {
-	breakdown := make(map[string]v1alpha1.EstimationDetail)
+func MigrationEstimationResultToAPI(result service.MigrationAssessmentResult) api.MigrationEstimationResponse {
+	breakdown := make(map[string]api.EstimationDetail)
 
 	for name, estimation := range result.Breakdown {
-		breakdown[name] = v1alpha1.EstimationDetail{
+		breakdown[name] = api.EstimationDetail{
 			Duration: estimation.Duration.String(),
 			Reason:   estimation.Reason,
 		}
 	}
 
-	return v1alpha1.MigrationEstimationResponse{
+	return api.MigrationEstimationResponse{
 		TotalDuration: result.TotalDuration.String(),
 		Breakdown:     breakdown,
 	}

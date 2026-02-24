@@ -29,6 +29,7 @@ func TestNewEngine(t *testing.T) {
 	e := NewEngine()
 	if e == nil {
 		t.Fatal("expected non-nil Engine")
+		return // linter was sad
 	}
 	if len(e.calculators) != 0 {
 		t.Errorf("expected 0 calculators, got %d", len(e.calculators))
