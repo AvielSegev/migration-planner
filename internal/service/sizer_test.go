@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -89,6 +90,10 @@ func (m *MockStore) Accounts() store.Accounts {
 
 func (m *MockStore) Close() error {
 	return nil
+}
+
+func (m *MockStore) WithMetricsCache(cache *metrics.MetricsCache) {
+	// No-op for tests
 }
 
 type MockAssessmentStore struct {

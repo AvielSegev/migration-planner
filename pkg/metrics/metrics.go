@@ -61,11 +61,9 @@ func UpdateAgentStateCounterMetric(state string, count int) {
 	agentStatusCountMetric.With(labels).Set(float64(count))
 }
 
-//func RegisterMetrics(s store.Store) {
-//	inventoryStatsCollector := newInventoryStatsCollector(s)
-//
-//	prometheus.MustRegister(inventoryStatsCollector)
-//	prometheus.MustRegister(ovaDownloadsTotalMetric)
-//	prometheus.MustRegister(agentStatusCountMetric)
-//	prometheus.MustRegister(totalUniqueVisitPerWeekMetric)
-//}
+func RegisterMetrics(cache *MetricsCache) {
+	prometheus.MustRegister(newInventoryStatsCollector(cache))
+	prometheus.MustRegister(ovaDownloadsTotalMetric)
+	prometheus.MustRegister(agentStatusCountMetric)
+	prometheus.MustRegister(totalUniqueVisitPerWeekMetric)
+}

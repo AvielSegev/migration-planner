@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -9,8 +10,11 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
+	"go.uber.org/zap"
 )
 
 type Assessment interface {
@@ -22,14 +26,21 @@ type Assessment interface {
 }
 
 type AssessmentStore struct {
-	db *gorm.DB
+	db           *gorm.DB
+	metricsCache *metrics.MetricsCache
 }
 
 // Make sure we conform to Assessment interface
 var _ Assessment = (*AssessmentStore)(nil)
 
 func NewAssessmentStore(db *gorm.DB) Assessment {
-	return &AssessmentStore{db: db}
+	return &AssessmentStore{
+		db: db,
+	}
+}
+
+func (a *AssessmentStore) WithMetricsCache(cache *metrics.MetricsCache) {
+	a.metricsCache = cache
 }
 
 func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error) {
@@ -87,6 +98,16 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 		return nil, err
 	}
 
+	// Update metrics cache
+	if a.metricsCache != nil {
+		var inv api.Inventory
+		if err := json.Unmarshal(inventory, &inv); err == nil {
+			a.metricsCache.ApplyCreate(assessment, inv)
+		} else {
+			zap.S().Debugw("failed to parse inventory for metrics", "error", err)
+		}
+	}
+
 	// Return the assessment with snapshots loaded
 	return a.Get(ctx, assessment.ID)
 }
@@ -129,10 +150,34 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 }
 
 func (a *AssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
+	// Fetch assessment + snapshot BEFORE deleting (for metrics)
+	var assessment *model.Assessment
+	var inv api.Inventory
+
+	if a.metricsCache != nil {
+		var err error
+		assessment, err = a.Get(ctx, id)
+		if err != nil && !errors.Is(err, ErrRecordNotFound) {
+			return err
+		}
+
+		// Parse inventory from latest snapshot
+		if assessment != nil && len(assessment.Snapshots) > 0 {
+			json.Unmarshal(assessment.Snapshots[0].Inventory, &inv)
+		}
+	}
+
+	// Existing delete operation
 	result := a.getDB(ctx).Unscoped().Delete(&model.Assessment{}, "id = ?", id.String())
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return result.Error
 	}
+
+	// Update metrics cache
+	if a.metricsCache != nil && assessment != nil {
+		a.metricsCache.ApplyDelete(*assessment, inv)
+	}
+
 	return nil
 }
 

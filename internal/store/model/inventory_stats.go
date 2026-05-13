@@ -62,10 +62,7 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 	for _, a := range assessments {
 		latesSnapshot := a.Snapshots[0] // we called List which orders snapshots by created_at. So we get the latest here
 
-		orgID := normalizeOrgId(a.OrgID)
-		if domain, err := getDomainName(a.Username); err == nil {
-			orgID = domain
-		}
+		orgID := DetermineOrgID(a.Username, a.OrgID)
 
 		inventory := &api.Inventory{}
 
@@ -88,6 +85,15 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 		TotalCustomers:                     len(orgIDs),
 		Storage:                            computeStorageStats(domainInventories),
 	}
+}
+
+func DetermineOrgID(username, orgID string) string {
+	if domain, err := getDomainName(username); err == nil {
+		return domain
+	}
+
+	// Fall back to normalized orgID
+	return normalizeOrgId(orgID)
 }
 
 func computeVmStats(domainInventories []domainInventory) VmStats {
@@ -130,10 +136,7 @@ func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]C
 	assessmentsByCustomer := make(map[string]CustomerAssessments)
 
 	for _, a := range assessments {
-		orgID := normalizeOrgId(a.OrgID)
-		if domain, err := getDomainName(a.Username); err == nil {
-			orgID = domain
-		}
+		orgID := DetermineOrgID(a.Username, a.OrgID)
 
 		customer := assessmentsByCustomer[orgID]
 

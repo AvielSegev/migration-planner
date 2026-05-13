@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"gorm.io/gorm"
 )
 
@@ -21,6 +22,7 @@ type Store interface {
 	Accounts() Accounts
 	PartnerCustomer() PartnerCustomer
 	Statistics(ctx context.Context) (model.InventoryStats, error)
+	WithMetricsCache(cache *metrics.MetricsCache)
 	Close() error
 }
 
@@ -110,6 +112,12 @@ func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error
 		return model.InventoryStats{}, err
 	}
 	return model.NewInventoryStats(assessments), nil
+}
+
+func (s *DataStore) WithMetricsCache(cache *metrics.MetricsCache) {
+	if as, ok := s.assessment.(*AssessmentStore); ok {
+		as.WithMetricsCache(cache)
+	}
 }
 
 func (s *DataStore) Close() error {

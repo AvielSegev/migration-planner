@@ -19,6 +19,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"github.com/spf13/cobra"
@@ -107,8 +108,16 @@ var runCmd = &cobra.Command{
 			}
 		}()
 
-		// register metrics
-		//metrics.RegisterMetrics(store)
+		initialStats, err := store.Statistics(ctx)
+		if err != nil {
+			zap.S().Named("metrics_cache").Errorw("failed to initialize metrics cache", "error", err)
+		}
+
+		// Create and initialize metrics cache
+		metricsCache := metrics.NewMetricsCache()
+		metricsCache.Initialize(initialStats)
+		store.WithMetricsCache(metricsCache)
+		metrics.RegisterMetrics(metricsCache)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
 			return apiserver.New(cfg, store, l, opaValidator, jobsClient)
