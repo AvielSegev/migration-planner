@@ -12,6 +12,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 )
 
@@ -23,10 +24,10 @@ type Client struct {
 }
 
 // NewClient creates a new River client with the RVTools worker registered.
-func NewClient(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (*Client, error) {
+func NewClient(pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator, eventBus events.EventBus) (*Client, error) {
 	rvtoolsFiles := store.NewRVToolsFileStore(pool)
 
-	worker := NewRVToolsWorker(s, rvtoolsFiles, opaValidator)
+	worker := NewRVToolsWorker(s, rvtoolsFiles, opaValidator, eventBus)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)

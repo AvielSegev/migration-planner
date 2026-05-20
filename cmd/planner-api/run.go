@@ -20,6 +20,8 @@ import (
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/kafka"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
@@ -27,6 +29,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+const kafkaBroker = "127.0.0.1:9092" // refactor before PR: should use broker list from config
 
 type Server interface {
 	Run(ctx context.Context) error
@@ -90,6 +94,19 @@ var runCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
+		// Create Kafka producer and event bus
+		var eventBus events.EventBus
+		producer, err := kafka.NewKafkaProducer([]string{kafkaBroker})
+		if err != nil {
+			zap.S().Warnw("failed to create kafka producer", "error", err)
+			eventBus = events.NewNoOpEventBus()
+		} else {
+			eventBus = events.NewKafkaEventBus(producer)
+			defer func() {
+				_ = producer.Close(context.Background())
+			}()
+		}
+
 		// Create pgx pool for River and RVTools file storage
 		zap.S().Info("Initializing River jobs client...")
 		pool, err := jobs.CreatePgxPool(ctx, cfg)
@@ -97,10 +114,11 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("creating pgx pool", "error", err)
 		}
 
-		jobsClient, err := jobs.NewClient(ctx, cfg, pool, store, opaValidator)
+		jobsClient, err := jobs.NewClient(pool, store, opaValidator, eventBus)
 		if err != nil {
 			zap.S().Fatalw("initializing River jobs client", "error", err)
 		}
+
 		if err := jobsClient.RiverClient.Start(context.Background()); err != nil {
 			zap.S().Fatalw("starting River jobs client", "error", err)
 		}
@@ -118,7 +136,7 @@ var runCmd = &cobra.Command{
 		metrics.RegisterMetrics(store)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
-			return apiserver.New(cfg, store, l, opaValidator, jobsClient)
+			return apiserver.New(cfg, store, l, opaValidator, jobsClient, eventBus)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {
@@ -126,12 +144,13 @@ var runCmd = &cobra.Command{
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.ImageEndpointAddress, "image_server", func(l net.Listener) Server {
-			return imageserver.New(cfg, store, l)
+			return imageserver.New(cfg, store, l, eventBus)
 		})
 
-		runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {
-			return apiserver.NewMetricServer("0.0.0.0:8080", l)
-		})
+		// Todo: Remove the comments lines. not related to this PR
+		//runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {
+		//	return apiserver.NewMetricServer("0.0.0.0:8080", l)
+		//})
 
 		<-ctx.Done()
 		wg.Wait()

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
@@ -31,6 +32,7 @@ type ImageServer struct {
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
+	eventBus events.EventBus
 }
 
 // New returns a new instance of a migration-planner server.
@@ -38,11 +40,13 @@ func New(
 	cfg *config.Config,
 	store store.Store,
 	listener net.Listener,
+	eventBus events.EventBus,
 ) *ImageServer {
 	return &ImageServer{
 		cfg:      cfg,
 		store:    store,
 		listener: listener,
+		eventBus: eventBus,
 	}
 }
 
@@ -77,7 +81,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		apiserver.WithResponseWriter,
 	)
 
-	h := handlers.NewImageHandler(s.store, s.cfg)
+	h := handlers.NewImageHandler(s.store, s.cfg, s.eventBus)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

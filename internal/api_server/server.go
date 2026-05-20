@@ -27,6 +27,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/middleware"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -43,6 +44,7 @@ type Server struct {
 	listener     net.Listener
 	opaValidator *opa.Validator
 	jobsClient   *jobs.Client
+	eventBus     events.EventBus
 }
 
 // New returns a new instance of a migration-planner server.
@@ -52,6 +54,7 @@ func New(
 	listener net.Listener,
 	opaValidator *opa.Validator,
 	jobsClient *jobs.Client,
+	eventBus events.EventBus,
 ) *Server {
 	return &Server{
 		cfg:          cfg,
@@ -59,6 +62,7 @@ func New(
 		listener:     listener,
 		opaValidator: opaValidator,
 		jobsClient:   jobsClient,
+		eventBus:     eventBus,
 	}
 }
 
@@ -175,13 +179,14 @@ func (s *Server) Run(ctx context.Context) error {
 	accountsSvc := service.NewAccountsService(s.store)
 
 	var assessmentSvc service.AssessmentServicer
-	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, accountsSvc)
+	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, accountsSvc).WithEventBus(s.eventBus)
+
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
 		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store, accountsSvc)
 	}
 
-	var partnerSvc service.PartnerServicer
-	partnerSvc = service.NewPartnerService(s.store, accountsSvc)
+	ps := service.NewPartnerService(s.store, accountsSvc).WithEventBus(s.eventBus)
+	var partnerSvc service.PartnerServicer = ps
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
 		partnerSvc = service.NewAuthzPartnerService(partnerSvc, accountsSvc, s.store)
 	}
@@ -190,8 +195,8 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
 		service.NewJobService(s.store, s.jobsClient.RiverClient, s.jobsClient.Pool),
-		service.NewSizerService(sizerClient, s.store),
-		service.NewEstimationService(s.store),
+		service.NewSizerService(sizerClient, s.store).WithEventBus(s.eventBus),
+		service.NewEstimationService(s.store).WithEventBus(s.eventBus),
 		accountsSvc,
 		partnerSvc,
 	)

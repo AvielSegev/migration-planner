@@ -17,7 +17,9 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 const (
@@ -72,6 +74,7 @@ type SizerService struct {
 	sizerClient *client.SizerClient
 	store       store.Store
 	logger      *log.StructuredLogger
+	eventBus    events.EventBus
 }
 
 // BatchedService represents an aggregated service workload for the sizer API.
@@ -121,7 +124,13 @@ func NewSizerService(sizerClient *client.SizerClient, store store.Store) *SizerS
 		sizerClient: sizerClient,
 		store:       store,
 		logger:      log.NewDebugLogger("sizing_service"),
+		eventBus:    events.NewNoOpEventBus(),
 	}
+}
+
+func (s *SizerService) WithEventBus(eventBus events.EventBus) *SizerService {
+	s.eventBus = eventBus
+	return s
 }
 
 // CalculateClusterRequirements calculates cluster requirements for an assessment
@@ -399,6 +408,20 @@ func (s *SizerService) CalculateClusterRequirements(
 	tracer.Success().
 		WithInt("total_nodes", transformed.ClusterSizing.TotalNodes).
 		Log()
+
+	assessmentIDStr := assessmentID.String()
+	event := events.NewUserActionEvent(events.UserActionData{
+		Username:     assessment.Username,
+		AssessmentID: &assessmentIDStr,
+		ActionType:   events.ActionTypeSizing,
+		Timestamp:    time.Now(),
+	})
+	if err := s.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish user action event",
+			"assessment_id", assessmentID,
+			"action_type", "sizing",
+			"error", err)
+	}
 
 	return &mappers.ClusterRequirementsResponseForm{
 		ClusterSizing:       transformed.ClusterSizing,

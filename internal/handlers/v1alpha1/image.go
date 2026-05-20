@@ -15,23 +15,26 @@ import (
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
 )
 
 type ImageHandler struct {
-	store store.Store
-	cfg   *config.Config
+	store    store.Store
+	cfg      *config.Config
+	eventBus events.EventBus
 }
 
 // Make sure we conform to servers Service interface
 var _ imageServer.Service = (*ImageHandler)(nil)
 
-func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
+func NewImageHandler(store store.Store, cfg *config.Config, eventBus events.EventBus) *ImageHandler {
 	return &ImageHandler{
-		store: store,
-		cfg:   cfg,
+		store:    store,
+		cfg:      cfg,
+		eventBus: eventBus,
 	}
 }
 
@@ -116,6 +119,21 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	http.ServeContent(writer, httpReq, req.Name, modTime, reader)
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
+
+	sourceIDStr := source.ID.String()
+	event := events.NewUserActionEvent(events.UserActionData{
+		Username:     source.Username,
+		AssessmentID: nil,
+		SourceID:     &sourceIDStr,
+		ActionType:   events.ActionTypeDownloadOVA,
+		Timestamp:    time.Now(),
+	})
+	if err := h.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish user action event",
+			"source_id", source.ID,
+			"action_type", "download_ova",
+			"error", err)
+	}
 
 	versionInfo := version.Get()
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {

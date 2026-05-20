@@ -16,7 +16,9 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation/calculators"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 // MigrationComplexityResult holds the output of a complexity estimation run.
@@ -39,16 +41,23 @@ type MigrationAssessmentResult struct {
 // It retrieves assessment and inventory data from the store and runs them
 // through the estimation Engine to produce a MigrationAssessmentResult.
 type EstimationService struct {
-	store  store.Store
-	logger *log.StructuredLogger
+	store    store.Store
+	logger   *log.StructuredLogger
+	eventBus events.EventBus
 }
 
 // NewEstimationService creates an EstimationService.
 func NewEstimationService(store store.Store) *EstimationService {
 	return &EstimationService{
-		store:  store,
-		logger: log.NewDebugLogger("estimation_service"),
+		store:    store,
+		logger:   log.NewDebugLogger("estimation_service"),
+		eventBus: events.NewNoOpEventBus(),
 	}
+}
+
+func (es *EstimationService) WithEventBus(eventBus events.EventBus) *EstimationService {
+	es.eventBus = eventBus
+	return es
 }
 
 // CalculateMigrationEstimation calculates migration time estimation for a given assessment and cluster
@@ -125,6 +134,20 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		WithInt("schema_count", len(results)).
 		Log()
 
+	assessmentIDStr := assessmentID.String()
+	event := events.NewUserActionEvent(events.UserActionData{
+		Username:     assessment.Username,
+		AssessmentID: &assessmentIDStr,
+		ActionType:   events.ActionTypeMigrationComplexity,
+		Timestamp:    time.Now(),
+	})
+	if err := es.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish user action event",
+			"assessment_id", assessmentID,
+			"action_type", events.ActionTypeMigrationComplexity,
+			"error", err)
+	}
+
 	return results, nil
 }
 
@@ -190,6 +213,21 @@ func (es *EstimationService) CalculateMigrationComplexity(
 	}
 
 	tracer.Success().Log()
+
+	assessmentIDStr := assessmentID.String()
+	event := events.NewUserActionEvent(events.UserActionData{
+		Username:     assessment.Username,
+		AssessmentID: &assessmentIDStr,
+		ActionType:   events.ActionTypeMigrationComplexity,
+		Timestamp:    time.Now(),
+	})
+	if err := es.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish user action event",
+			"assessment_id", assessmentID,
+			"action_type", events.ActionTypeMigrationComplexity,
+			"error", err)
+	}
+
 	return result, nil
 }
 

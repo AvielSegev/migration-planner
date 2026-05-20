@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
@@ -26,14 +27,16 @@ type RVToolsWorker struct {
 	store        store.Store
 	rvtoolsFiles store.RVToolsFile
 	validator    duckdb_parser.Validator
+	eventBus     events.EventBus
 }
 
 // NewRVToolsWorker creates a new RVTools worker.
-func NewRVToolsWorker(store store.Store, rvtoolsFiles store.RVToolsFile, validator duckdb_parser.Validator) *RVToolsWorker {
+func NewRVToolsWorker(store store.Store, rvtoolsFiles store.RVToolsFile, validator duckdb_parser.Validator, eventBus events.EventBus) *RVToolsWorker {
 	return &RVToolsWorker{
 		store:        store,
 		rvtoolsFiles: rvtoolsFiles,
 		validator:    validator,
+		eventBus:     eventBus,
 	}
 }
 
@@ -191,6 +194,11 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	// Update job with assessment ID
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
 		logger.Error(err).WithString("step", "update_completed_status").Log()
+	}
+
+	event := events.NewAssessmentCreatedEvent(createdAssessment, inventoryJSON)
+	if err := w.eventBus.Publish(ctx, event); err != nil {
+		logger.Error(err).WithString("step", "publish_assessment_event").Log()
 	}
 
 	logger.Success().

@@ -10,6 +10,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events"
+	"go.uber.org/zap"
 )
 
 func revokeSharedAssessments(ctx context.Context, s store.Store, username, partnerID string) error {
@@ -47,10 +49,21 @@ type PartnerServicer interface {
 type PartnerService struct {
 	store       store.Store
 	accountsSvc *AccountsService
+	eventBus    events.EventBus
 }
 
-func NewPartnerService(store store.Store, accounts *AccountsService) PartnerServicer {
-	return &PartnerService{store: store, accountsSvc: accounts}
+func NewPartnerService(store store.Store, accounts *AccountsService) *PartnerService {
+	return &PartnerService{
+		store:       store,
+		accountsSvc: accounts,
+		eventBus:    events.NewNoOpEventBus(),
+	}
+}
+
+// WithEventBus sets the event bus for the partner service
+func (s *PartnerService) WithEventBus(eventBus events.EventBus) *PartnerService {
+	s.eventBus = eventBus
+	return s
 }
 
 // ListPartners returns all partner groups.
@@ -114,6 +127,23 @@ func (s *PartnerService) CreateRequest(ctx context.Context, user auth.User, part
 		}
 		return nil, err
 	}
+
+	event := events.NewPartnerCustomerEvent(events.PartnerCustomerData{
+		ID:               created.ID.String(),
+		CustomerUsername: created.Username,
+		PartnerID:        created.PartnerID,
+		RequestStatus:    string(created.RequestStatus),
+		Location:         created.Location,
+		AcceptedAt:       created.AcceptedAt,
+		TerminatedAt:     created.TerminatedAt,
+		CreatedAt:        created.CreatedAt,
+	})
+	if err := s.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish partner-customer event",
+			"id", created.ID,
+			"error", err)
+	}
+
 	return created, nil
 }
 
@@ -133,12 +163,32 @@ func (s *PartnerService) CancelRequest(ctx context.Context, user auth.User, requ
 		return NewErrInvalidRequest("only pending requests can be cancelled")
 	}
 	now := time.Now()
-	_, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	updated, err := s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            requestID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	event := events.NewPartnerCustomerEvent(events.PartnerCustomerData{
+		ID:               updated.ID.String(),
+		CustomerUsername: updated.Username,
+		PartnerID:        updated.PartnerID,
+		RequestStatus:    string(updated.RequestStatus),
+		Location:         updated.Location,
+		AcceptedAt:       updated.AcceptedAt,
+		TerminatedAt:     updated.TerminatedAt,
+		CreatedAt:        updated.CreatedAt,
+	})
+	if err := s.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish partner-customer cancel event",
+			"id", updated.ID,
+			"error", err)
+	}
+
+	return nil
 }
 
 // GetPartner returns the partner group for a customer.
@@ -184,11 +234,12 @@ func (s *PartnerService) LeavePartner(ctx context.Context, user auth.User, partn
 	}()
 
 	now := time.Now()
-	if _, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	updated, err := s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            pc.ID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
@@ -196,8 +247,27 @@ func (s *PartnerService) LeavePartner(ctx context.Context, user auth.User, partn
 		return err
 	}
 
-	_, err = store.Commit(ctx)
-	return err
+	if _, err = store.Commit(ctx); err != nil {
+		return err
+	}
+
+	event := events.NewPartnerCustomerEvent(events.PartnerCustomerData{
+		ID:               updated.ID.String(),
+		CustomerUsername: updated.Username,
+		PartnerID:        updated.PartnerID,
+		RequestStatus:    string(updated.RequestStatus),
+		Location:         updated.Location,
+		AcceptedAt:       updated.AcceptedAt,
+		TerminatedAt:     updated.TerminatedAt,
+		CreatedAt:        updated.CreatedAt,
+	})
+	if err := s.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish partner-customer leave event",
+			"id", updated.ID,
+			"error", err)
+	}
+
+	return nil
 }
 
 // ListCustomers returns all customer requests for the partner's group.
@@ -241,7 +311,29 @@ func (s *PartnerService) UpdateRequest(ctx context.Context, user auth.User, requ
 		now := time.Now()
 		update.AcceptedAt = &now
 	}
-	return s.store.PartnerCustomer().Update(ctx, update)
+	updated, err := s.store.PartnerCustomer().Update(ctx, update)
+	if err != nil {
+		return nil, err
+	}
+
+	event := events.NewPartnerCustomerEvent(events.PartnerCustomerData{
+		ID:               updated.ID.String(),
+		CustomerUsername: updated.Username,
+		PartnerID:        updated.PartnerID,
+		RequestStatus:    string(updated.RequestStatus),
+		Location:         updated.Location,
+		AcceptedAt:       updated.AcceptedAt,
+		TerminatedAt:     updated.TerminatedAt,
+		CreatedAt:        updated.CreatedAt,
+	})
+	if err := s.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish partner-customer update event",
+			"id", updated.ID,
+			"status", updated.RequestStatus,
+			"error", err)
+	}
+
+	return updated, nil
 }
 
 // RemoveCustomer removes a customer from the partner's group.
@@ -266,11 +358,12 @@ func (s *PartnerService) RemoveCustomer(ctx context.Context, user auth.User, use
 	}()
 
 	now := time.Now()
-	if _, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	updated, err := s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            pc.ID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
@@ -278,6 +371,25 @@ func (s *PartnerService) RemoveCustomer(ctx context.Context, user auth.User, use
 		return err
 	}
 
-	_, err = store.Commit(ctx)
-	return err
+	if _, err = store.Commit(ctx); err != nil {
+		return err
+	}
+
+	event := events.NewPartnerCustomerEvent(events.PartnerCustomerData{
+		ID:               updated.ID.String(),
+		CustomerUsername: updated.Username,
+		PartnerID:        updated.PartnerID,
+		RequestStatus:    string(updated.RequestStatus),
+		Location:         updated.Location,
+		AcceptedAt:       updated.AcceptedAt,
+		TerminatedAt:     updated.TerminatedAt,
+		CreatedAt:        updated.CreatedAt,
+	})
+	if err := s.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish partner-customer remove event",
+			"id", updated.ID,
+			"error", err)
+	}
+
+	return nil
 }

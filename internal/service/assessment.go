@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 type AssessmentServicer interface {
@@ -37,15 +40,27 @@ type AssessmentService struct {
 	opaValidator *opa.Validator
 	accountsSvc  *AccountsService
 	logger       *log.StructuredLogger
+	eventBus     events.EventBus
 }
 
-func NewAssessmentService(store store.Store, opaValidator *opa.Validator, accountsSvc *AccountsService) *AssessmentService {
+func NewAssessmentService(
+	store store.Store,
+	opaValidator *opa.Validator,
+	accountsSvc *AccountsService,
+) *AssessmentService {
 	return &AssessmentService{
 		store:        store,
 		opaValidator: opaValidator,
 		accountsSvc:  accountsSvc,
 		logger:       log.NewDebugLogger("assessment_service"),
+		eventBus:     events.NewNoOpEventBus(),
 	}
+}
+
+// WithEventBus sets the event bus for the assessment service
+func (as *AssessmentService) WithEventBus(eventBus events.EventBus) *AssessmentService {
+	as.eventBus = eventBus
+	return as
 }
 
 func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
@@ -84,6 +99,14 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 	assessments, err := as.store.Assessment().List(ctx, storeFilter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assessments: %w", err)
+	}
+
+	if err := as.eventBus.Publish(ctx, events.NewVisitorEvent(filter.Username, filter.OrgID)); err != nil {
+		zap.S().Warnw("failed to publish visitor event",
+			"username", filter.Username,
+			"org_id", filter.OrgID,
+			"error", err,
+		)
 	}
 
 	tracer.Success().WithInt("count", len(assessments)).Log()
@@ -202,6 +225,12 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		WithString("source_type", createdAssessment.SourceType).
 		Log()
 
+	event := events.NewAssessmentCreatedEvent(createdAssessment, inventory)
+	if err := as.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish assessment created event",
+			"assessment_id", assessment.ID, "error", err)
+	}
+
 	return createdAssessment, nil
 }
 
@@ -293,6 +322,12 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 	}
 
 	tracer.Success().WithString("deleted_assessment_name", assessment.Name).Log()
+
+	if err := as.eventBus.Publish(context.Background(), events.NewAssessmentDeletedEvent(assessment.ID.String())); err != nil {
+		zap.S().Warnw("failed to publish assessment deleted event",
+			"assessment_id", assessment.ID, "error", err)
+	}
+
 	return nil
 }
 
@@ -308,7 +343,8 @@ func (as *AssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) 
 	}()
 
 	// Verify assessment exists
-	if _, err := as.store.Assessment().Get(ctx, id); err != nil {
+	assessment, err := as.store.Assessment().Get(ctx, id)
+	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
 			return NewErrAssessmentNotFound(id)
 		}
@@ -337,6 +373,21 @@ func (as *AssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) 
 		return err
 	}
 
+	assessmentID := assessment.ID.String()
+	event := events.NewUserActionEvent(events.UserActionData{
+		Username:     user.Username,
+		AssessmentID: &assessmentID,
+		PartnerID:    identity.PartnerID,
+		ActionType:   events.ActionTypeShareAssessment,
+		Timestamp:    time.Now(),
+	})
+	if err := as.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish user action event",
+			"assessment_id", assessment.ID,
+			"action_type", events.ActionTypeShareAssessment,
+			"error", err)
+	}
+
 	return nil
 }
 
@@ -352,7 +403,8 @@ func (as *AssessmentService) UnshareAssessment(ctx context.Context, id uuid.UUID
 	}()
 
 	// Verify assessment exists
-	if _, err := as.store.Assessment().Get(ctx, id); err != nil {
+	assessment, err := as.store.Assessment().Get(ctx, id)
+	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
 			return NewErrAssessmentNotFound(id)
 		}
@@ -379,6 +431,21 @@ func (as *AssessmentService) UnshareAssessment(ctx context.Context, id uuid.UUID
 
 	if _, err := store.Commit(ctx); err != nil {
 		return err
+	}
+
+	assessmentIDStr := assessment.ID.String()
+	event := events.NewUserActionEvent(events.UserActionData{
+		Username:     user.Username,
+		AssessmentID: &assessmentIDStr,
+		PartnerID:    identity.PartnerID,
+		ActionType:   events.ActionTypeUnshareAssessment,
+		Timestamp:    time.Now(),
+	})
+	if err := as.eventBus.Publish(ctx, event); err != nil {
+		zap.S().Warnw("failed to publish user action event",
+			"assessment_id", assessment.ID,
+			"action_type", events.ActionTypeUnshareAssessment,
+			"error", err)
 	}
 
 	return nil
