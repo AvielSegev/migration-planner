@@ -23,4 +23,5 @@ const (
 	MigrationTimeEstimationEventType = "assisted.migration.user_action.time_estimated"
 	DownloadOVAEventType             = "assisted.migration.user_action.ova_downloaded"
 	VisitorEventType                 = "assisted.migration.user_action.visited"
+	ErrorEventType                   = "assisted.migration.error.occurred"
 )

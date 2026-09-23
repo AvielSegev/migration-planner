@@ -5,11 +5,14 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/requestid"
+	"go.uber.org/zap"
 )
 
 type EventSizerService struct {
@@ -29,6 +32,9 @@ func (e *EventSizerService) CalculateClusterRequirements(
 ) (*api.ClusterRequirementsResponse, error) {
 	result, err := e.inner.CalculateClusterRequirements(ctx, assessmentID, req)
 	if err != nil {
+		if eventErr := e.writeErrorEvent(ctx, "calculate_requirements"); eventErr != nil {
+			zap.S().Warnw("failed to write sizing error event", "error", eventErr, "assessment_id", assessmentID)
+		}
 		return nil, err
 	}
 
@@ -47,6 +53,26 @@ func (e *EventSizerService) CalculateClusterRequirements(
 	}
 
 	return result, nil
+}
+
+func (e *EventSizerService) writeErrorEvent(ctx context.Context, step string) error {
+	var actor *kafka.ErrorActor
+	if user, ok := auth.UserFromContext(ctx); ok && user.Organization != "" {
+		actor = &kafka.ErrorActor{OrgID: user.Organization}
+	}
+	payload := kafka.NewErrorPayload(
+		kafka.SeverityError,
+		"sizing.calculate",
+		step,
+		"Cluster sizing could not be calculated",
+		actor,
+		requestid.FromContext(ctx),
+	)
+	data, buildErr := kafka.BuildErrorCloudEvent(payload)
+	if buildErr != nil {
+		return buildErr
+	}
+	return e.outbox.Insert(ctx, events.EventTypeKafka, data)
 }
 
 func (e *EventSizerService) CalculateStandaloneClusterRequirements(
