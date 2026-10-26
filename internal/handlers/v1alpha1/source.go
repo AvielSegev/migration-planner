@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -267,6 +268,11 @@ func (h *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uui
 
 // inventoryUpdateResponse handles the common logic for updating inventory and returning the mapped source
 func (h *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID uuid.UUID, form srvMappers.InventoryUpdateForm) (*v1alpha1.Source, *inventoryUpdateError, error) {
+	v := util.GetInventoryVersion(form.Inventory)
+	if v == model.InventoryVersionV1 {
+		return nil, &inventoryUpdateError{code: http.StatusBadRequest, message: fmt.Sprintf("please upload a newer inventory version")}, nil
+	}
+
 	updatedSource, err := h.sourceSrv.UpdateInventory(ctx, form)
 	if err != nil {
 		switch err.(type) {
