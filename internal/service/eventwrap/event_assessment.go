@@ -2,7 +2,6 @@ package eventwrap
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -72,14 +71,9 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
-	inventory, err := json.Marshal(assessment.MainInventory.Inventory)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal assessment inventory: %w", err)
-	}
-
 	payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
 		ID:         assessment.ID.String(),
-		Inventory:  inventory,
+		Inventory:  mappers.ToStreamerModel(assessment.MainInventory.Inventory),
 		Name:       assessment.Name,
 		OrgID:      assessment.OrgID,
 		OrgName:    accountIdentity.Name,
