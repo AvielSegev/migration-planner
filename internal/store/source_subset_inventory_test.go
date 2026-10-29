@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -57,7 +57,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				SourceID:   testSource.ID,
 				VCenterID:  "vcenter-1",
 				VMsCount:   10,
-				Inventory:  []byte(`{"vcenter": {"id": "vcenter-1"}}`),
+				Inventory:  model.Inventory{VcenterId: "vcenter-1"},
 				UpdateType: "auto",
 			}
 
@@ -79,7 +79,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				ID:        uuid.New(),
 				Name:      "Test Subset",
 				SourceID:  testSource.ID,
-				Inventory: []byte(`{}`),
+				Inventory: model.Inventory{},
 			}
 
 			created, err := s.SourceSubsetInventory().Create(context.TODO(), inventory)
@@ -92,11 +92,30 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				ID:        uuid.New(),
 				Name:      "Test Subset",
 				SourceID:  uuid.New(), // Non-existent source
-				Inventory: []byte(`{}`),
+				Inventory: model.Inventory{},
 			}
 
 			_, err := s.SourceSubsetInventory().Create(context.TODO(), inventory)
 			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("CreateMany", func() {
+		It("persists structured subsets with their original inventory versions", func() {
+			inventories := []model.SourceSubsetInventory{
+				{ID: uuid.New(), SourceID: testSource.ID, Name: "legacy", Version: model.InventoryVersionV1,
+					Inventory: model.Inventory{VcenterId: "vc-1", Vcenter: &model.InventoryData{Vcenter: &model.VCenter{Id: "vc-1"}, Vms: model.VMs{Total: 3}}}},
+				{ID: uuid.New(), SourceID: testSource.ID, Name: "modern", Version: model.InventoryVersionV2,
+					Inventory: model.Inventory{VcenterId: "vc-1", Vcenter: &model.InventoryData{Vms: model.VMs{Total: 5}}}},
+			}
+			Expect(s.SourceSubsetInventory().CreateMany(context.TODO(), inventories)).To(Succeed())
+			for _, want := range inventories {
+				got, err := s.SourceSubsetInventory().Get(context.TODO(), want.ID)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(got.Version).To(Equal(want.Version))
+				Expect(got.Inventory.VcenterId).To(Equal("vc-1"))
+				Expect(got.Inventory.Vcenter.Vms.Total).To(Equal(want.Inventory.Vcenter.Vms.Total))
+			}
 		})
 	})
 
@@ -110,7 +129,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				SourceID:   testSource.ID,
 				VCenterID:  "vcenter-1",
 				VMsCount:   5,
-				Inventory:  []byte(`{"vcenter": {"id": "vcenter-1"}}`),
+				Inventory:  model.Inventory{VcenterId: "vcenter-1"},
 				UpdateType: "auto",
 			}
 			var err error
@@ -143,7 +162,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				Name:       "Original Name",
 				SourceID:   testSource.ID,
 				VMsCount:   5,
-				Inventory:  []byte(`{"original": "data"}`),
+				Inventory:  model.Inventory{VcenterId: "original"},
 				UpdateType: "auto",
 			}
 			var err error
@@ -154,7 +173,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 		It("should update source inventory successfully", func() {
 			testInventory.Name = "Updated Name"
 			testInventory.VMsCount = 15
-			testInventory.Inventory = []byte(`{"updated": "data"}`)
+			testInventory.Inventory = model.Inventory{VcenterId: "updated"}
 			testInventory.UpdateType = "manual"
 
 			updated, err := s.SourceSubsetInventory().Update(context.TODO(), *testInventory)
@@ -171,7 +190,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				Name:      "Does Not Exist",
 				SourceID:  testSource.ID,
 				VMsCount:  99,
-				Inventory: []byte(`{}`),
+				Inventory: model.Inventory{},
 			}
 
 			_, err := s.SourceSubsetInventory().Update(context.TODO(), nonExistent)
@@ -205,7 +224,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				ID:        uuid.New(),
 				Name:      "Test Subset",
 				SourceID:  testSource.ID,
-				Inventory: []byte(`{}`),
+				Inventory: model.Inventory{},
 			}
 			var err error
 			testInventory, err = s.SourceSubsetInventory().Create(context.TODO(), inventory)
@@ -239,7 +258,7 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 					Name:      "Subset " + string(rune('A'+i)),
 					SourceID:  testSource.ID,
 					VMsCount:  i + 1,
-					Inventory: []byte(`{}`),
+					Inventory: model.Inventory{},
 				}
 				created, err := s.SourceSubsetInventory().Create(context.TODO(), inventory)
 				Expect(err).NotTo(HaveOccurred())
@@ -280,13 +299,13 @@ var _ = Describe("SourceSubsetInventory Store", Ordered, func() {
 				ID:        uuid.New(),
 				Name:      "Subset 1",
 				SourceID:  testSource.ID,
-				Inventory: []byte(`{}`),
+				Inventory: model.Inventory{},
 			}
 			inventory2 := model.SourceSubsetInventory{
 				ID:        uuid.New(),
 				Name:      "Subset 2",
 				SourceID:  testSource.ID,
-				Inventory: []byte(`{}`),
+				Inventory: model.Inventory{},
 			}
 
 			_, err := s.SourceSubsetInventory().Create(context.TODO(), inventory1)

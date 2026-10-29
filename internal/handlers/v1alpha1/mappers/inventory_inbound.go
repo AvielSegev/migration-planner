@@ -73,6 +73,9 @@ func clusterUtilizationFromAPI(c api.ClusterUtilization) svcmodel.ClusterUtiliza
 func infraFromAPI(i api.Infra) svcmodel.Infra {
 	result := svcmodel.Infra{
 		ClustersPerDatacenter:   i.ClustersPerDatacenter,
+		HostsPerCluster:         i.HostsPerCluster,
+		TotalClusters:           i.TotalClusters,
+		VmsPerCluster:           i.VmsPerCluster,
 		CpuOverCommitment:       i.CpuOverCommitment,
 		HostPowerStates:         i.HostPowerStates,
 		MemoryOverCommitment:    i.MemoryOverCommitment,
@@ -112,6 +115,8 @@ func vcenterFromAPI(v api.VCenter) svcmodel.VCenter {
 
 func vmsFromAPI(v api.VMs) svcmodel.VMs {
 	result := svcmodel.VMs{
+		DistributionByComplexity:    v.DistributionByComplexity,
+		Os:                          v.Os,
 		CpuCores:                    vmResourceBreakdownFromAPI(v.CpuCores),
 		DiskCount:                   vmResourceBreakdownFromAPI(v.DiskCount),
 		DiskGB:                      vmResourceBreakdownFromAPI(v.DiskGB),

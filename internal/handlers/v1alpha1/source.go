@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,9 +15,10 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/inventorybundle"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -291,15 +291,11 @@ func (h *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.
 		return nil, updateErr, err
 	}
 
-	data, err := json.Marshal(body.Inventory)
-	if err != nil {
-		return nil, &inventoryUpdateError{code: http.StatusInternalServerError, message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
-	}
-
 	form := srvMappers.InventoryUpdateForm{
 		AgentID:   body.AgentId,
 		SourceID:  sourceID,
-		Inventory: data,
+		Inventory: mappers.InventoryFromAPI(body.Inventory),
+		Version:   model.InventoryVersionV2,
 		VCenterID: body.Inventory.VcenterId,
 		Subsets:   []srvMappers.SourceSubsetUpdateForm{}, // JSON uploads have no subsets
 	}
@@ -332,21 +328,33 @@ func (h *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID 
 		agentID = source.Agents[0].ID
 	}
 
+	mainVersion := util.GetInventoryVersion(parsed.MainInventory)
+	mainInventory, err := util.UnmarshalInventory(parsed.MainInventory, uint(mainVersion))
+	if err != nil {
+		return nil, &inventoryUpdateError{code: http.StatusBadRequest, message: err.Error()}, nil
+	}
 	form := srvMappers.InventoryUpdateForm{
 		AgentID:   agentID,
 		SourceID:  sourceID,
-		Inventory: parsed.MainInventory,
+		Inventory: mappers.InventoryFromAPI(mainInventory),
+		Version:   uint(mainVersion),
 		VCenterID: parsed.VCenterID,
 		Subsets:   make([]srvMappers.SourceSubsetUpdateForm, len(parsed.Subsets)),
 	}
 	for i, subset := range parsed.Subsets {
+		subsetVersion := util.GetInventoryVersion(subset.Inventory)
+		subsetInventory, err := util.UnmarshalInventory(subset.Inventory, uint(subsetVersion))
+		if err != nil {
+			return nil, &inventoryUpdateError{code: http.StatusBadRequest, message: err.Error()}, nil
+		}
 		form.Subsets[i] = srvMappers.SourceSubsetUpdateForm{
 			ID:        subset.ID,
 			Name:      subset.Name,
 			SourceID:  sourceID,
 			VCenterID: subset.VCenterID,
 			VMsCount:  subset.VMsCount,
-			Inventory: subset.Inventory,
+			Inventory: mappers.InventoryFromAPI(subsetInventory),
+			Version:   uint(subsetVersion),
 		}
 	}
 
