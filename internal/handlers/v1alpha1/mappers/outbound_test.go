@@ -268,10 +268,20 @@ var _ = Describe("Inventory collection time", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(subset.Inventory.CollectionTime).To(Equal(&want))
 		assessmentID := uuid.New()
-		main, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "main", false, raw)
-		Expect(err).NotTo(HaveOccurred())
-		group, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "group", true, raw)
-		Expect(err).NotTo(HaveOccurred())
+		main := model.AssessmentInventory{
+			ID:           uuid.New(),
+			AssessmentID: assessmentID,
+			Name:         "main",
+			IsSubset:     false,
+			Inventory:    raw,
+		}
+		group := model.AssessmentInventory{
+			ID:           uuid.New(),
+			AssessmentID: assessmentID,
+			Name:         "group",
+			IsSubset:     true,
+			Inventory:    raw,
+		}
 		createdAt := want.Add(24 * time.Hour)
 		domainAssessment, err := storemappers.AssessmentFromStore(&model.Assessment{
 			CreatedAt:   createdAt,

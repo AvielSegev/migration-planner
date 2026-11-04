@@ -15,7 +15,6 @@ var _ = Describe("inventory aggregation", func() {
 	It("combines VM totals and utilization across inventories", func() {
 		inventories := []svcmodel.InventoryData{
 			{
-				Vcenter: &svcmodel.VCenter{Id: "vc-1"},
 				Vms: svcmodel.VMs{
 					Total:    2,
 					CpuCores: svcmodel.VMResourceBreakdown{Total: 2},
@@ -24,7 +23,6 @@ var _ = Describe("inventory aggregation", func() {
 				},
 			},
 			{
-				Vcenter: &svcmodel.VCenter{Id: "vc-1"},
 				Vms: svcmodel.VMs{
 					Total:    6,
 					CpuCores: svcmodel.VMResourceBreakdown{Total: 6},
@@ -36,7 +34,6 @@ var _ = Describe("inventory aggregation", func() {
 
 		got := AggregateInventoryData(inventories)
 
-		Expect(got.Vcenter).To(Equal(&svcmodel.VCenter{Id: "vc-1"}))
 		Expect(got.Vms.Total).To(Equal(8))
 		Expect(got.Vms.CpuCores.Total).To(Equal(8))
 		Expect(got.Vms.RamGB.Total).To(Equal(16))
@@ -144,22 +141,10 @@ var _ = Describe("inventory aggregation", func() {
 		Expect(got.Vms.DiskGB.Total).To(Equal(100))
 	})
 
-	It("omits the vCenter ID when inventory IDs disagree", func() {
-		inventories := []svcmodel.InventoryData{
-			{Vcenter: &svcmodel.VCenter{Id: "vc-1"}},
-			{Vcenter: &svcmodel.VCenter{Id: "vc-2"}},
-		}
-
-		got := AggregateInventoryData(inventories)
-
-		Expect(got.Vcenter).To(BeNil())
-	})
-
 	It("returns an empty aggregate when there are no inventories", func() {
 		got := AggregateInventoryData(nil)
 
 		Expect(got.Vms.Total).To(Equal(0))
-		Expect(got.Vcenter).To(BeNil())
 	})
 })
 
@@ -169,18 +154,16 @@ var _ = Describe("Aggregate", func() {
 			VcenterId: "vc-1",
 			Clusters:  map[string]svcmodel.InventoryData{},
 			Vcenter: &svcmodel.InventoryData{
-				Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-				Vms:     svcmodel.VMs{Total: 3, CpuCores: svcmodel.VMResourceBreakdown{Total: 4}},
-				Infra:   svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "net-1"}}},
+				Vms:   svcmodel.VMs{Total: 3, CpuCores: svcmodel.VMResourceBreakdown{Total: 4}},
+				Infra: svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "net-1"}}},
 			},
 		})
 		inv2 := mustMarshal(svcmodel.Inventory{
 			VcenterId: "vc-1",
 			Clusters:  map[string]svcmodel.InventoryData{},
 			Vcenter: &svcmodel.InventoryData{
-				Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-				Vms:     svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 8}},
-				Infra:   svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}}, Networks: []svcmodel.Network{{Name: "net-2"}}},
+				Vms:   svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 8}},
+				Infra: svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}}, Networks: []svcmodel.Network{{Name: "net-2"}}},
 			},
 		})
 
@@ -207,14 +190,12 @@ var _ = Describe("Aggregate", func() {
 
 	It("aggregates V1 assessment inventories", func() {
 		inv1 := mustMarshal(svcmodel.InventoryData{
-			Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-			Vms:     svcmodel.VMs{Total: 2},
-			Infra:   svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "n-1"}}},
+			Vms:   svcmodel.VMs{Total: 2},
+			Infra: svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "n-1"}}},
 		})
 		inv2 := mustMarshal(svcmodel.InventoryData{
-			Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-			Vms:     svcmodel.VMs{Total: 3},
-			Infra:   svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}}, Networks: []svcmodel.Network{{Name: "n-2"}}},
+			Vms:   svcmodel.VMs{Total: 3},
+			Infra: svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}}, Networks: []svcmodel.Network{{Name: "n-2"}}},
 		})
 
 		models := []model.AssessmentInventory{
@@ -248,9 +229,8 @@ var _ = Describe("AssessmentInventoryFromStore", func() {
 			VcenterId: "vc-1",
 			Clusters:  map[string]svcmodel.InventoryData{},
 			Vcenter: &svcmodel.InventoryData{
-				Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-				Vms:     svcmodel.VMs{Total: 10},
-				Infra:   svcmodel.Infra{TotalHosts: 3},
+				Vms:   svcmodel.VMs{Total: 10},
+				Infra: svcmodel.Infra{TotalHosts: 3},
 			},
 		})
 
@@ -267,9 +247,8 @@ var _ = Describe("AssessmentInventoryFromStore", func() {
 
 	It("unmarshals V1 inventory", func() {
 		raw := mustMarshal(svcmodel.InventoryData{
-			Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-			Vms:     svcmodel.VMs{Total: 5},
-			Infra:   svcmodel.Infra{TotalHosts: 2},
+			Vms:   svcmodel.VMs{Total: 5},
+			Infra: svcmodel.Infra{TotalHosts: 2},
 		})
 
 		inv := model.AssessmentInventory{Version: model.InventoryVersionV1, Inventory: raw}

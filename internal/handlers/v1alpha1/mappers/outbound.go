@@ -12,6 +12,7 @@ import (
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
@@ -79,9 +80,6 @@ func normalizeInventoryData(data *api.InventoryData) {
 	if data.Vms.DistributionByNicCount == nil {
 		data.Vms.DistributionByNicCount = &map[string]int{}
 	}
-	if data.Vms.DistributionByComplexity == nil {
-		data.Vms.DistributionByComplexity = &map[string]int{}
-	}
 }
 
 func SourceToApi(s model.Source) (api.Source, error) {
@@ -107,14 +105,15 @@ func SourceToApi(s model.Source) (api.Source, error) {
 			if err := json.Unmarshal(s.Inventory, &i); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 			}
-			if i.Vcenter == nil {
-				return api.Source{}, fmt.Errorf("v1 inventory missing vcenter data")
+			id, err := storemappers.VCenterIDFromV1Inventory(s.Inventory)
+			if err != nil {
+				return api.Source{}, fmt.Errorf("failed to decode v1 vCenter ID: %w", err)
 			}
 			// Normalize to prevent null values from database
 			normalizeInventoryData(&i)
 			source.Inventory = &api.Inventory{
 				Vcenter:   &i,
-				VcenterId: i.Vcenter.Id,
+				VcenterId: id,
 				Clusters:  map[string]api.InventoryData{},
 			}
 		default:
@@ -476,8 +475,12 @@ func StoreAssessmentInventoryToAPI(inv model.AssessmentInventory) (api.Inventory
 		if err := json.Unmarshal(inv.Inventory, &result.Data); err != nil {
 			return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 		}
-		if result.Id == "" && result.Data.Vcenter != nil {
-			result.Id = result.Data.Vcenter.Id
+		if result.Id == "" {
+			id, err := storemappers.VCenterIDFromV1Inventory(inv.Inventory)
+			if err != nil {
+				return api.InventoryV2{}, nil, fmt.Errorf("failed to decode v1 vCenter ID: %w", err)
+			}
+			result.Id = id
 		}
 		normalizeInventoryData(&result.Data)
 		return result, clusters, nil

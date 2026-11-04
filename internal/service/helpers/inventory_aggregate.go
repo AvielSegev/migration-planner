@@ -25,8 +25,8 @@ func Aggregate(inventories []model.AssessmentInventory) (model.Inventory, error)
 
 	aggregated := AggregateInventoryData(dataSlice)
 	result.Vcenter = &aggregated
-	if aggregated.Vcenter != nil {
-		result.VcenterId = aggregated.Vcenter.Id
+	if vID, ok := vcenterID(inventories); ok {
+		result.VcenterId = vID
 	}
 	return result, nil
 }
@@ -34,15 +34,9 @@ func Aggregate(inventories []model.AssessmentInventory) (model.Inventory, error)
 func AggregateInventoryData(inventories []model.InventoryData) model.InventoryData {
 	vms := aggregateVMs(inventories)
 
-	var vcenter *model.VCenter
-	if vID, ok := vcenterID(inventories); ok {
-		vcenter = &model.VCenter{Id: vID}
-	}
-
 	return model.InventoryData{
-		Infra:   aggregateInfra(inventories, vms),
-		Vcenter: vcenter,
-		Vms:     vms,
+		Infra: aggregateInfra(inventories, vms),
+		Vms:   vms,
 	}
 }
 
@@ -53,9 +47,6 @@ func aggregateVMs(inventories []model.InventoryData) model.VMs {
 	var diskTypes map[string]model.DiskTypeSummary
 	var osInfo map[string]model.OsInfo
 	var distributionByCpuTier, distributionByMemoryTier, distributionByNicCount map[string]int
-
-	var nicCount model.VMResourceBreakdown
-	var nicCountSeen bool
 
 	for _, inventory := range inventories {
 		vms := inventory.Vms
@@ -72,10 +63,6 @@ func aggregateVMs(inventories []model.InventoryData) model.VMs {
 		result.DiskCount = addVMResourceBreakdown(result.DiskCount, vms.DiskCount)
 		result.DiskGB = addVMResourceBreakdown(result.DiskGB, vms.DiskGB)
 		result.RamGB = addVMResourceBreakdown(result.RamGB, vms.RamGB)
-		if vms.NicCount != nil {
-			nicCount = addVMResourceBreakdown(nicCount, *vms.NicCount)
-			nicCountSeen = true
-		}
 
 		for state, count := range vms.PowerStates {
 			result.PowerStates[state] += count
@@ -91,9 +78,6 @@ func aggregateVMs(inventories []model.InventoryData) model.VMs {
 		distributionByNicCount = mergeMap(distributionByNicCount, vms.DistributionByNicCount, addInt)
 	}
 
-	if nicCountSeen {
-		result.NicCount = &nicCount
-	}
 	result.ComplexityDistribution = optionalMap(complexityDistribution)
 	result.DiskComplexityTier = optionalMap(diskComplexityTier)
 	result.DiskSizeTier = optionalMap(diskSizeTier)
@@ -390,14 +374,14 @@ func optionalMap[V any](m map[string]V) *map[string]V {
 	return &m
 }
 
-func vcenterID(inventories []model.InventoryData) (string, bool) {
-	if len(inventories) == 0 || inventories[0].Vcenter == nil {
+func vcenterID(inventories []model.AssessmentInventory) (string, bool) {
+	if len(inventories) == 0 || inventories[0].Inventory.VcenterId == "" {
 		return "", false
 	}
 
-	id := inventories[0].Vcenter.Id
+	id := inventories[0].Inventory.VcenterId
 	for _, inventory := range inventories[1:] {
-		if inventory.Vcenter == nil || inventory.Vcenter.Id != id {
+		if inventory.Inventory.VcenterId != id {
 			return "", false
 		}
 	}

@@ -130,9 +130,11 @@ func UnmarshalInventory(raw []byte, version uint) (model.Inventory, error) {
 			return model.Inventory{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 		}
 		inv := model.Inventory{Vcenter: &data, Clusters: make(map[string]model.InventoryData)}
-		if data.Vcenter != nil {
-			inv.VcenterId = data.Vcenter.Id
+		id, err := VCenterIDFromV1Inventory(raw)
+		if err != nil {
+			return model.Inventory{}, fmt.Errorf("failed to decode v1 vCenter ID: %w", err)
 		}
+		inv.VcenterId = id
 		return inv, nil
 	}
 	var inv model.Inventory
@@ -181,4 +183,19 @@ func SharingFromStore(sharing *storemodel.Sharing) *model.Sharing {
 		}
 	}
 	return result
+}
+
+func VCenterIDFromV1Inventory(raw []byte) (string, error) {
+	var legacy struct {
+		Vcenter *struct {
+			ID string `json:"id"`
+		} `json:"vcenter"`
+	}
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		return "", err
+	}
+	if legacy.Vcenter == nil {
+		return "", nil
+	}
+	return legacy.Vcenter.ID, nil
 }

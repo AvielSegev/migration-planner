@@ -812,13 +812,6 @@ type GroupUpdate struct {
 	Name        *string `json:"name,omitempty" validate:"omitempty"`
 }
 
-// Histogram defines model for Histogram.
-type Histogram struct {
-	Data     []int `json:"data"`
-	MinValue int   `json:"minValue"`
-	Step     int   `json:"step"`
-}
-
 // Host defines model for Host.
 type Host struct {
 	// CpuCores Number of CPU cores
@@ -877,8 +870,6 @@ type Infra struct {
 	Datastores        []Datastore    `json:"datastores"`
 	HostPowerStates   map[string]int `json:"hostPowerStates"`
 	Hosts             *[]Host        `json:"hosts,omitempty"`
-	// Deprecated:
-	HostsPerCluster *[]int `json:"hostsPerCluster,omitempty"`
 
 	// MemoryOverCommitment RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
 	MemoryOverCommitment *float64  `json:"memoryOverCommitment,omitempty"`
@@ -886,12 +877,8 @@ type Infra struct {
 
 	// StandaloneHostsDetected Whether any hosts run without vCenter cluster management (not part of any cluster)
 	StandaloneHostsDetected *bool `json:"standaloneHostsDetected,omitempty"`
-	// Deprecated:
-	TotalClusters    *int `json:"totalClusters,omitempty"`
-	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
-	TotalHosts       int  `json:"totalHosts"`
-	// Deprecated:
-	VmsPerCluster *[]int `json:"vmsPerCluster,omitempty"`
+	TotalDatacenters        *int  `json:"totalDatacenters,omitempty"`
+	TotalHosts              int   `json:"totalHosts"`
 
 	// VmsPerHostAverage Average VM density per ESXi host. Calculated as total VMs / totalHosts
 	VmsPerHostAverage *float64 `json:"vmsPerHostAverage,omitempty"`
@@ -921,7 +908,6 @@ type InventoryData struct {
 	ClusterFeatures    *ClusterFeatures    `json:"clusterFeatures,omitempty"`
 	ClusterUtilization *ClusterUtilization `json:"clusterUtilization,omitempty"`
 	Infra              Infra               `json:"infra"`
-	Vcenter            *VCenter            `json:"vcenter,omitempty"`
 	Vms                VMs                 `json:"vms"`
 }
 
@@ -1443,24 +1429,17 @@ type UpdateInventory struct {
 	Inventory Inventory          `json:"inventory"`
 }
 
-// VCenter defines model for VCenter.
-type VCenter struct {
-	Id string `json:"id"`
-}
-
 // VMResourceBreakdown defines model for VMResourceBreakdown.
 type VMResourceBreakdown struct {
-	// Deprecated:
-	Histogram                      *Histogram `json:"histogram,omitempty"`
-	Total                          int        `json:"total"`
-	TotalForMigratable             int        `json:"totalForMigratable"`
-	TotalForMigratableWithWarnings int        `json:"totalForMigratableWithWarnings"`
-	TotalForNotMigratable          int        `json:"totalForNotMigratable"`
+	Total                          int `json:"total"`
+	TotalForMigratable             int `json:"totalForMigratable"`
+	TotalForMigratableWithWarnings int `json:"totalForMigratableWithWarnings"`
+	TotalForNotMigratable          int `json:"totalForNotMigratable"`
 }
 
 // VMs defines model for VMs.
 type VMs struct {
-	// ComplexityDistribution Distribution of VMs by migration complexity level, enriched with total disk size per level. Supersedes distributionByComplexity.
+	// ComplexityDistribution Distribution of VMs by migration complexity level, enriched with total disk size per level.
 	ComplexityDistribution *map[string]DiskSizeTierSummary `json:"complexityDistribution,omitempty"`
 	CpuCores               VMResourceBreakdown             `json:"cpuCores"`
 
@@ -1471,10 +1450,6 @@ type VMs struct {
 	DiskSizeTier       *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
 	DiskTypes          *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
 
-	// DistributionByComplexity Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
-	// Deprecated:
-	DistributionByComplexity *map[string]int `json:"distributionByComplexity,omitempty"`
-
 	// DistributionByCpuTier Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
 	DistributionByCpuTier *map[string]int `json:"distributionByCpuTier,omitempty"`
 
@@ -1482,13 +1457,10 @@ type VMs struct {
 	DistributionByMemoryTier *map[string]int `json:"distributionByMemoryTier,omitempty"`
 
 	// DistributionByNicCount Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
-	DistributionByNicCount *map[string]int      `json:"distributionByNicCount,omitempty"`
-	IssuesBreakdown        *IssuesBreakdown     `json:"issuesBreakdown,omitempty"`
-	MigrationWarnings      []MigrationIssue     `json:"migrationWarnings"`
-	NicCount               *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons   []MigrationIssue     `json:"notMigratableReasons"`
-	// Deprecated:
-	Os                          *map[string]int     `json:"os,omitempty"`
+	DistributionByNicCount      *map[string]int     `json:"distributionByNicCount,omitempty"`
+	IssuesBreakdown             *IssuesBreakdown    `json:"issuesBreakdown,omitempty"`
+	MigrationWarnings           []MigrationIssue    `json:"migrationWarnings"`
+	NotMigratableReasons        []MigrationIssue    `json:"notMigratableReasons"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
 	PowerStates                 map[string]int      `json:"powerStates"`
 	RamGB                       VMResourceBreakdown `json:"ramGB"`

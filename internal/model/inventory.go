@@ -37,8 +37,9 @@ type InventoryData struct {
 	ClusterFeatures    *ClusterFeatures    `json:"clusterFeatures,omitempty"`
 	ClusterUtilization *ClusterUtilization `json:"clusterUtilization,omitempty"`
 	Infra              Infra               `json:"infra"`
-	Vcenter            *VCenter            `json:"vcenter,omitempty"`
-	Vms                VMs                 `json:"vms"`
+	// Deprecated:
+	Vcenter *VCenter `json:"vcenter,omitempty"`
+	Vms     VMs      `json:"vms"`
 }
 
 // ClusterFeaturesDrsMode is the DRS automation mode for a cluster.
@@ -98,14 +99,15 @@ type VMs struct {
 	DiskSizeTier           *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
 	DiskTypes              *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
 	// Deprecated:
-	DistributionByComplexity *map[string]int      `json:"distributionByComplexity,omitempty"`
-	DistributionByCpuTier    *map[string]int      `json:"distributionByCpuTier,omitempty"`
-	DistributionByMemoryTier *map[string]int      `json:"distributionByMemoryTier,omitempty"`
-	DistributionByNicCount   *map[string]int      `json:"distributionByNicCount,omitempty"`
-	IssuesBreakdown          *IssuesBreakdown     `json:"issuesBreakdown,omitempty"`
-	MigrationWarnings        []MigrationIssue     `json:"migrationWarnings"`
-	NicCount                 *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons     []MigrationIssue     `json:"notMigratableReasons"`
+	DistributionByComplexity *map[string]int  `json:"distributionByComplexity,omitempty"`
+	DistributionByCpuTier    *map[string]int  `json:"distributionByCpuTier,omitempty"`
+	DistributionByMemoryTier *map[string]int  `json:"distributionByMemoryTier,omitempty"`
+	DistributionByNicCount   *map[string]int  `json:"distributionByNicCount,omitempty"`
+	IssuesBreakdown          *IssuesBreakdown `json:"issuesBreakdown,omitempty"`
+	MigrationWarnings        []MigrationIssue `json:"migrationWarnings"`
+	// Deprecated:
+	NicCount             *VMResourceBreakdown `json:"nicCount,omitempty"`
+	NotMigratableReasons []MigrationIssue     `json:"notMigratableReasons"`
 	// Deprecated:
 	Os                          *map[string]int     `json:"os,omitempty"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`

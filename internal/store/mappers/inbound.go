@@ -43,11 +43,7 @@ func AssessmentInventoriesToStore(inventories ...svcmodel.AssessmentInventory) (
 }
 
 func assessmentInventoryToStore(inventory svcmodel.AssessmentInventory) (model.AssessmentInventory, error) {
-	var data any = inventory.Inventory
-	if inventory.Version == svcmodel.InventoryVersionV1 {
-		data = inventory.Inventory.Vcenter
-	}
-	raw, err := json.Marshal(data)
+	raw, err := marshalSourceInventory(inventory.Inventory, inventory.Version)
 	if err != nil {
 		return model.AssessmentInventory{}, fmt.Errorf("failed to marshal inventory: %w", err)
 	}
@@ -58,4 +54,22 @@ func assessmentInventoryToStore(inventory svcmodel.AssessmentInventory) (model.A
 		VMsCount: inventory.VMsCount, HostsCount: inventory.HostsCount,
 		NetworksCount: inventory.NetworksCount, DatastoresCount: inventory.DatastoresCount,
 	}, nil
+}
+
+func marshalSourceInventory(inventory svcmodel.Inventory, version uint) ([]byte, error) {
+	if version == svcmodel.InventoryVersionV1 {
+		if inventory.Vcenter == nil {
+			return json.Marshal(nil)
+		}
+		// Keep the ID when rewriting legacy storage; API responses use vcenter_id.
+		legacy := struct {
+			*svcmodel.InventoryData
+			Vcenter map[string]string `json:"vcenter,omitempty"`
+		}{InventoryData: inventory.Vcenter}
+		if inventory.VcenterId != "" {
+			legacy.Vcenter = map[string]string{"id": inventory.VcenterId}
+		}
+		return json.Marshal(legacy)
+	}
+	return json.Marshal(inventory)
 }

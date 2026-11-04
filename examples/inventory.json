@@ -9,67 +9,27 @@
                 "total": 10,
                 "totalForMigratable": 6,
                 "totalForMigratableWithWarnings": 1,
-                "totalForNotMigratable": 3,
-                "histogram": {
-                    "minValue": 1,
-                    "step": 1,
-                    "data": [
-                        3,
-                        0,
-                        2,
-                        5
-                    ]
-                }
+                "totalForNotMigratable": 3
             },
             "ramGB": {
                 "total": 20,
                 "totalForMigratable": 10,
                 "totalForMigratableWithWarnings": 3,
-                "totalForNotMigratable": 7,
-                "histogram": {
-                    "minValue": 1,
-                    "step": 1,
-                    "data": [
-                        3,
-                        0,
-                        2,
-                        5
-                    ]
-                }
+                "totalForNotMigratable": 7
             },
             "diskGB": {
                 "total": 200,
                 "totalForMigratable": 100,
                 "totalForMigratableWithWarnings": 30,
-                "totalForNotMigratable": 70,
-                "histogram": {
-                    "minValue": 100,
-                    "step": 10,
-                    "data": [
-                        3,
-                        0,
-                        2,
-                        5
-                    ]
-                }
+                "totalForNotMigratable": 70
             },
             "diskCount": {
                 "total": 20,
                 "totalForMigratable": 10,
                 "totalForMigratableWithWarnings": 3,
-                "totalForNotMigratable": 7,
-                "histogram": {
-                    "minValue": 1,
-                    "step": 1,
-                    "data": [
-                        6,
-                        0,
-                        4,
-                        10
-                    ]
-                }
+                "totalForNotMigratable": 7
             },
-            "os": {
+            "osInfo": {
                 "Microsoft Windows Server 2022 (64-bit)": {
                     "count": 1,
                     "supported": true
@@ -103,12 +63,7 @@
                 1
             ],
             "totalHosts": 5,
-            "totalClusters": 2,
             "totalDatacenters": 1,
-            "hostsPerCluster": [
-                2,
-                3
-            ],
             "hostPowerStates": {
                 "POWERED_ON": 5
             },

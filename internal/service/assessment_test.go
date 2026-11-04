@@ -1228,27 +1228,24 @@ var _ = Describe("assessment service", Ordered, func() {
 				VcenterId: "vc-1",
 				Clusters:  map[string]v1alpha1.InventoryData{},
 				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 1},
-					Infra:   v1alpha1.Infra{TotalHosts: 1},
+					Vms:   v1alpha1.VMs{Total: 1},
+					Infra: v1alpha1.Infra{TotalHosts: 1},
 				},
 			})
 			inv1JSON, _ := json.Marshal(v1alpha1.Inventory{
 				VcenterId: "vc-1",
 				Clusters:  map[string]v1alpha1.InventoryData{},
 				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 3, CpuCores: v1alpha1.VMResourceBreakdown{Total: 6}},
-					Infra:   v1alpha1.Infra{TotalHosts: 1, Datastores: []v1alpha1.Datastore{{DiskId: "ds-1"}}, Networks: []v1alpha1.Network{{Name: "net-1"}}},
+					Vms:   v1alpha1.VMs{Total: 3, CpuCores: v1alpha1.VMResourceBreakdown{Total: 6}},
+					Infra: v1alpha1.Infra{TotalHosts: 1, Datastores: []v1alpha1.Datastore{{DiskId: "ds-1"}}, Networks: []v1alpha1.Network{{Name: "net-1"}}},
 				},
 			})
 			inv2JSON, _ := json.Marshal(v1alpha1.Inventory{
 				VcenterId: "vc-1",
 				Clusters:  map[string]v1alpha1.InventoryData{},
 				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 5, CpuCores: v1alpha1.VMResourceBreakdown{Total: 10}},
-					Infra:   v1alpha1.Infra{TotalHosts: 2, Datastores: []v1alpha1.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []v1alpha1.Network{{Name: "net-2"}}},
+					Vms:   v1alpha1.VMs{Total: 5, CpuCores: v1alpha1.VMResourceBreakdown{Total: 10}},
+					Infra: v1alpha1.Infra{TotalHosts: 2, Datastores: []v1alpha1.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []v1alpha1.Network{{Name: "net-2"}}},
 				},
 			})
 
@@ -1290,18 +1287,16 @@ var _ = Describe("assessment service", Ordered, func() {
 				VcenterId: "vc-1",
 				Clusters:  map[string]v1alpha1.InventoryData{},
 				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 100},
-					Infra:   v1alpha1.Infra{TotalHosts: 50},
+					Vms:   v1alpha1.VMs{Total: 100},
+					Infra: v1alpha1.Infra{TotalHosts: 50},
 				},
 			})
 			subsetJSON, _ := json.Marshal(v1alpha1.Inventory{
 				VcenterId: "vc-1",
 				Clusters:  map[string]v1alpha1.InventoryData{},
 				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 7},
-					Infra:   v1alpha1.Infra{TotalHosts: 2},
+					Vms:   v1alpha1.VMs{Total: 7},
+					Infra: v1alpha1.Infra{TotalHosts: 2},
 				},
 			})
 

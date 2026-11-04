@@ -472,8 +472,6 @@ func (p *Parser) ResourceBreakdowns(ctx context.Context, filters Filters) (AllRe
 		&result.DiskCount.TotalForMigratableWithWarnings, &result.DiskCount.TotalForNotMigratable,
 		&result.DiskGB.Total, &result.DiskGB.TotalForMigratable,
 		&result.DiskGB.TotalForMigratableWithWarnings, &result.DiskGB.TotalForNotMigratable,
-		&result.NicCount.Total, &result.NicCount.TotalForMigratable,
-		&result.NicCount.TotalForMigratableWithWarnings, &result.NicCount.TotalForNotMigratable,
 	); err != nil {
 		return AllResourceBreakdowns{}, fmt.Errorf("scanning resource breakdowns: %w", err)
 	}

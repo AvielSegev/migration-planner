@@ -44,10 +44,6 @@ func inventoryDataToAPI(d svcmodel.InventoryData) api.InventoryData {
 		utilization := clusterUtilizationToAPI(*d.ClusterUtilization)
 		result.ClusterUtilization = &utilization
 	}
-	if d.Vcenter != nil {
-		vcenter := vcenterToAPI(*d.Vcenter)
-		result.Vcenter = &vcenter
-	}
 	return result
 }
 
@@ -109,10 +105,6 @@ func infraToAPI(i svcmodel.Infra) api.Infra {
 		}
 	}
 	return result
-}
-
-func vcenterToAPI(v svcmodel.VCenter) api.VCenter {
-	return api.VCenter{Id: v.Id}
 }
 
 func vmsToAPI(v svcmodel.VMs) api.VMs {
@@ -181,10 +173,6 @@ func vmsToAPI(v svcmodel.VMs) api.VMs {
 		for index, warning := range v.MigrationWarnings {
 			result.MigrationWarnings[index] = migrationIssueToAPI(warning)
 		}
-	}
-	if v.NicCount != nil {
-		count := vmResourceBreakdownToAPI(*v.NicCount)
-		result.NicCount = &count
 	}
 	if v.NotMigratableReasons != nil {
 		result.NotMigratableReasons = make([]api.MigrationIssue, len(v.NotMigratableReasons))
@@ -275,19 +263,7 @@ func vmResourceBreakdownToAPI(b svcmodel.VMResourceBreakdown) api.VMResourceBrea
 		TotalForMigratableWithWarnings: b.TotalForMigratableWithWarnings,
 		TotalForNotMigratable:          b.TotalForNotMigratable,
 	}
-	if b.Histogram != nil {
-		histogram := histogramToAPI(*b.Histogram)
-		result.Histogram = &histogram
-	}
 	return result
-}
-
-func histogramToAPI(h svcmodel.Histogram) api.Histogram {
-	return api.Histogram{
-		Data:     h.Data,
-		MinValue: h.MinValue,
-		Step:     h.Step,
-	}
 }
 
 func diskSizeTierSummaryToAPI(s svcmodel.DiskSizeTierSummary) api.DiskSizeTierSummary {
