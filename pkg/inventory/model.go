@@ -55,11 +55,9 @@ type VMsData struct {
 	RamGB                       ResourceBreakdown
 	DiskCount                   ResourceBreakdown
 	DiskGB                      ResourceBreakdown
-	NicCount                    ResourceBreakdown
 	DistributionByCPUTier       map[string]int
 	DistributionByMemoryTier    map[string]int
 	DistributionByNICCount      map[string]int
-	DistributionByComplexity    map[string]int
 	ComplexityDistribution      map[string]DiskSizeTierSummary
 	DiskSizeTiers               map[string]DiskSizeTierSummary
 	DiskComplexityTiers         map[string]DiskSizeTierSummary // 4-bucket complexity tiers for estimation engine

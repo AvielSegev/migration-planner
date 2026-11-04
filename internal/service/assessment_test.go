@@ -1224,27 +1224,24 @@ var _ = Describe("assessment service", Ordered, func() {
 				VcenterId: "vc-1",
 				Clusters:  map[string]svcmodel.InventoryData{},
 				Vcenter: &svcmodel.InventoryData{
-					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-					Vms:     svcmodel.VMs{Total: 1},
-					Infra:   svcmodel.Infra{TotalHosts: 1},
+					Vms:   svcmodel.VMs{Total: 1},
+					Infra: svcmodel.Infra{TotalHosts: 1},
 				},
 			}
 			inv1JSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
 				Clusters:  map[string]svcmodel.InventoryData{},
 				Vcenter: &svcmodel.InventoryData{
-					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-					Vms:     svcmodel.VMs{Total: 3, CpuCores: svcmodel.VMResourceBreakdown{Total: 6}},
-					Infra:   svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "net-1"}}},
+					Vms:   svcmodel.VMs{Total: 3, CpuCores: svcmodel.VMResourceBreakdown{Total: 6}},
+					Infra: svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "net-1"}}},
 				},
 			}
 			inv2JSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
 				Clusters:  map[string]svcmodel.InventoryData{},
 				Vcenter: &svcmodel.InventoryData{
-					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-					Vms:     svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 10}},
-					Infra:   svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []svcmodel.Network{{Name: "net-2"}}},
+					Vms:   svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 10}},
+					Infra: svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []svcmodel.Network{{Name: "net-2"}}},
 				},
 			}
 
@@ -1283,18 +1280,16 @@ var _ = Describe("assessment service", Ordered, func() {
 				VcenterId: "vc-1",
 				Clusters:  map[string]svcmodel.InventoryData{},
 				Vcenter: &svcmodel.InventoryData{
-					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-					Vms:     svcmodel.VMs{Total: 100},
-					Infra:   svcmodel.Infra{TotalHosts: 50},
+					Vms:   svcmodel.VMs{Total: 100},
+					Infra: svcmodel.Infra{TotalHosts: 50},
 				},
 			}
 			subsetJSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
 				Clusters:  map[string]svcmodel.InventoryData{},
 				Vcenter: &svcmodel.InventoryData{
-					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
-					Vms:     svcmodel.VMs{Total: 7},
-					Infra:   svcmodel.Infra{TotalHosts: 2},
+					Vms:   svcmodel.VMs{Total: 7},
+					Infra: svcmodel.Infra{TotalHosts: 2},
 				},
 			}
 

@@ -33,5 +33,4 @@ type AllResourceBreakdowns struct {
 	RamGB     inventory.ResourceBreakdown
 	DiskCount inventory.ResourceBreakdown
 	DiskGB    inventory.ResourceBreakdown
-	NicCount  inventory.ResourceBreakdown
 }

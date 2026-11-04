@@ -77,9 +77,6 @@ func normalizeInventoryData(data *api.InventoryData) {
 	if data.Vms.DistributionByNicCount == nil {
 		data.Vms.DistributionByNicCount = &map[string]int{}
 	}
-	if data.Vms.DistributionByComplexity == nil {
-		data.Vms.DistributionByComplexity = &map[string]int{}
-	}
 }
 
 func SourceToApi(s svcmodel.Source) (api.Source, error) {
@@ -98,7 +95,7 @@ func SourceToApi(s svcmodel.Source) (api.Source, error) {
 	}
 
 	if s.Inventory != nil {
-		if s.Version == svcmodel.InventoryVersionV1 && (s.Inventory.Vcenter == nil || s.Inventory.Vcenter.Vcenter == nil) {
+		if s.Version == svcmodel.InventoryVersionV1 && s.Inventory.Vcenter == nil {
 			return api.Source{}, fmt.Errorf("v1 inventory missing vcenter data")
 		}
 		inventory := normalizeDomainInventory(*s.Inventory)

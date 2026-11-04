@@ -19,9 +19,11 @@ func UnmarshalInventory(raw []byte, version uint) (api.Inventory, error) {
 			return api.Inventory{}, err
 		}
 		inventory := api.Inventory{Vcenter: &data, Clusters: make(map[string]api.InventoryData)}
-		if data.Vcenter != nil {
-			inventory.VcenterId = data.Vcenter.Id
+		id, err := model.VCenterIDFromV1Inventory(raw)
+		if err != nil {
+			return api.Inventory{}, err
 		}
+		inventory.VcenterId = id
 		return inventory, nil
 	}
 	var inventory api.Inventory

@@ -79,9 +79,28 @@ func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, i
 		ai.HostsCount = invData.Infra.TotalHosts
 		ai.NetworksCount = len(invData.Infra.Networks)
 		ai.DatastoresCount = len(invData.Infra.Datastores)
-		if invData.Vcenter != nil {
-			ai.VCenterID = invData.Vcenter.Id
+		var err error
+		ai.VCenterID, err = VCenterIDFromV1Inventory(raw)
+		if err != nil {
+			return AssessmentInventory{}, fmt.Errorf("failed to decode v1 vCenter ID: %w", err)
 		}
 	}
 	return ai, nil
+}
+
+// VCenterIDFromV1Inventory reads the ID from the legacy storage format without
+// retaining the deprecated nested vcenter property in the public inventory model.
+func VCenterIDFromV1Inventory(raw []byte) (string, error) {
+	var legacy struct {
+		Vcenter *struct {
+			ID string `json:"id"`
+		} `json:"vcenter"`
+	}
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		return "", err
+	}
+	if legacy.Vcenter == nil {
+		return "", nil
+	}
+	return legacy.Vcenter.ID, nil
 }

@@ -37,7 +37,6 @@ type InventoryData struct {
 	ClusterFeatures    *ClusterFeatures    `json:"clusterFeatures,omitempty"`
 	ClusterUtilization *ClusterUtilization `json:"clusterUtilization,omitempty"`
 	Infra              Infra               `json:"infra"`
-	Vcenter            *VCenter            `json:"vcenter,omitempty"`
 	Vms                VMs                 `json:"vms"`
 }
 
@@ -64,59 +63,43 @@ type ClusterUtilization struct {
 
 // Infra describes the physical/virtual infrastructure of the inventory.
 type Infra struct {
-	ClustersPerDatacenter *[]int         `json:"clustersPerDatacenter,omitempty"`
-	CpuOverCommitment     *float64       `json:"cpuOverCommitment,omitempty"`
-	Datastores            []Datastore    `json:"datastores"`
-	HostPowerStates       map[string]int `json:"hostPowerStates"`
-	Hosts                 *[]Host        `json:"hosts,omitempty"`
-	// Deprecated:
-	HostsPerCluster         *[]int    `json:"hostsPerCluster,omitempty"`
-	MemoryOverCommitment    *float64  `json:"memoryOverCommitment,omitempty"`
-	Networks                []Network `json:"networks"`
-	StandaloneHostsDetected *bool     `json:"standaloneHostsDetected,omitempty"`
-	// Deprecated:
-	TotalClusters    *int `json:"totalClusters,omitempty"`
-	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
-	TotalHosts       int  `json:"totalHosts"`
-	// Deprecated:
-	VmsPerCluster     *[]int   `json:"vmsPerCluster,omitempty"`
-	VmsPerHostAverage *float64 `json:"vmsPerHostAverage,omitempty"`
-}
-
-// VCenter identifies a vCenter.
-type VCenter struct {
-	Id string `json:"id"`
+	ClustersPerDatacenter   *[]int         `json:"clustersPerDatacenter,omitempty"`
+	CpuOverCommitment       *float64       `json:"cpuOverCommitment,omitempty"`
+	Datastores              []Datastore    `json:"datastores"`
+	HostPowerStates         map[string]int `json:"hostPowerStates"`
+	Hosts                   *[]Host        `json:"hosts,omitempty"`
+	MemoryOverCommitment    *float64       `json:"memoryOverCommitment,omitempty"`
+	Networks                []Network      `json:"networks"`
+	StandaloneHostsDetected *bool          `json:"standaloneHostsDetected,omitempty"`
+	TotalDatacenters        *int           `json:"totalDatacenters,omitempty"`
+	TotalHosts              int            `json:"totalHosts"`
+	VmsPerHostAverage       *float64       `json:"vmsPerHostAverage,omitempty"`
 }
 
 // VMs aggregates virtual-machine statistics for an inventory.
 type VMs struct {
-	ComplexityDistribution *map[string]DiskSizeTierSummary `json:"complexityDistribution,omitempty"`
-	CpuCores               VMResourceBreakdown             `json:"cpuCores"`
-	DiskComplexityTier     *map[string]DiskSizeTierSummary `json:"diskComplexityTier,omitempty"`
-	DiskCount              VMResourceBreakdown             `json:"diskCount"`
-	DiskGB                 VMResourceBreakdown             `json:"diskGB"`
-	DiskSizeTier           *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
-	DiskTypes              *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
-	// Deprecated:
-	DistributionByComplexity *map[string]int      `json:"distributionByComplexity,omitempty"`
-	DistributionByCpuTier    *map[string]int      `json:"distributionByCpuTier,omitempty"`
-	DistributionByMemoryTier *map[string]int      `json:"distributionByMemoryTier,omitempty"`
-	DistributionByNicCount   *map[string]int      `json:"distributionByNicCount,omitempty"`
-	IssuesBreakdown          *IssuesBreakdown     `json:"issuesBreakdown,omitempty"`
-	MigrationWarnings        []MigrationIssue     `json:"migrationWarnings"`
-	NicCount                 *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons     []MigrationIssue     `json:"notMigratableReasons"`
-	// Deprecated:
-	Os                          *map[string]int     `json:"os,omitempty"`
-	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
-	PowerStates                 map[string]int      `json:"powerStates"`
-	RamGB                       VMResourceBreakdown `json:"ramGB"`
-	Total                       int                 `json:"total"`
-	TotalMigratable             int                 `json:"totalMigratable"`
-	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
-	TotalWithFaultTolerance     *int                `json:"totalWithFaultTolerance,omitempty"`
-	TotalWithRDM                *int                `json:"totalWithRDM,omitempty"`
-	TotalWithSharedDisks        *int                `json:"totalWithSharedDisks,omitempty"`
+	ComplexityDistribution      *map[string]DiskSizeTierSummary `json:"complexityDistribution,omitempty"`
+	CpuCores                    VMResourceBreakdown             `json:"cpuCores"`
+	DiskComplexityTier          *map[string]DiskSizeTierSummary `json:"diskComplexityTier,omitempty"`
+	DiskCount                   VMResourceBreakdown             `json:"diskCount"`
+	DiskGB                      VMResourceBreakdown             `json:"diskGB"`
+	DiskSizeTier                *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
+	DiskTypes                   *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
+	DistributionByCpuTier       *map[string]int                 `json:"distributionByCpuTier,omitempty"`
+	DistributionByMemoryTier    *map[string]int                 `json:"distributionByMemoryTier,omitempty"`
+	DistributionByNicCount      *map[string]int                 `json:"distributionByNicCount,omitempty"`
+	IssuesBreakdown             *IssuesBreakdown                `json:"issuesBreakdown,omitempty"`
+	MigrationWarnings           []MigrationIssue                `json:"migrationWarnings"`
+	NotMigratableReasons        []MigrationIssue                `json:"notMigratableReasons"`
+	OsInfo                      *map[string]OsInfo              `json:"osInfo,omitempty"`
+	PowerStates                 map[string]int                  `json:"powerStates"`
+	RamGB                       VMResourceBreakdown             `json:"ramGB"`
+	Total                       int                             `json:"total"`
+	TotalMigratable             int                             `json:"totalMigratable"`
+	TotalMigratableWithWarnings *int                            `json:"totalMigratableWithWarnings,omitempty"`
+	TotalWithFaultTolerance     *int                            `json:"totalWithFaultTolerance,omitempty"`
+	TotalWithRDM                *int                            `json:"totalWithRDM,omitempty"`
+	TotalWithSharedDisks        *int                            `json:"totalWithSharedDisks,omitempty"`
 }
 
 // DatastoreStorageProtocol is the storage access category derived from a datastore type.
@@ -178,19 +161,10 @@ type Network struct {
 
 // VMResourceBreakdown breaks a resource total down by migratability.
 type VMResourceBreakdown struct {
-	// Deprecated:
-	Histogram                      *Histogram `json:"histogram,omitempty"`
-	Total                          int        `json:"total"`
-	TotalForMigratable             int        `json:"totalForMigratable"`
-	TotalForMigratableWithWarnings int        `json:"totalForMigratableWithWarnings"`
-	TotalForNotMigratable          int        `json:"totalForNotMigratable"`
-}
-
-// Histogram is a simple histogram.
-type Histogram struct {
-	Data     []int `json:"data"`
-	MinValue int   `json:"minValue"`
-	Step     int   `json:"step"`
+	Total                          int `json:"total"`
+	TotalForMigratable             int `json:"totalForMigratable"`
+	TotalForMigratableWithWarnings int `json:"totalForMigratableWithWarnings"`
+	TotalForNotMigratable          int `json:"totalForNotMigratable"`
 }
 
 // DiskSizeTierSummary summarizes a disk-size tier.

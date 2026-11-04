@@ -156,13 +156,6 @@ func vmsFromDuckDB(v *inventory.VMsData) svcmodel.VMs {
 		})
 	}
 
-	nicCount := svcmodel.VMResourceBreakdown{
-		Total:                          v.NicCount.Total,
-		TotalForMigratable:             v.NicCount.TotalForMigratable,
-		TotalForMigratableWithWarnings: v.NicCount.TotalForMigratableWithWarnings,
-		TotalForNotMigratable:          v.NicCount.TotalForNotMigratable,
-	}
-
 	migratableWithWarnings := v.TotalMigratableWithWarnings
 	totalWithSharedDisks := v.TotalWithSharedDisks
 	totalWithRDM := v.TotalWithRDM
@@ -201,11 +194,9 @@ func vmsFromDuckDB(v *inventory.VMsData) svcmodel.VMs {
 			TotalForMigratableWithWarnings: v.DiskGB.TotalForMigratableWithWarnings,
 			TotalForNotMigratable:          v.DiskGB.TotalForNotMigratable,
 		},
-		NicCount:                 &nicCount,
 		DistributionByCpuTier:    &v.DistributionByCPUTier,
 		DistributionByMemoryTier: &v.DistributionByMemoryTier,
 		DistributionByNicCount:   &v.DistributionByNICCount,
-		DistributionByComplexity: &v.DistributionByComplexity,
 		ComplexityDistribution:   &complexityDist,
 		DiskSizeTier:             &diskSizeTiers,
 		DiskComplexityTier:       diskComplexityTierPtr,

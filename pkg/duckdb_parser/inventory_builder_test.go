@@ -1407,12 +1407,6 @@ func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 	assert.Equal(t, 1, enriched["0"].VMCount)
 	assert.InDelta(t, 0.005, enriched["0"].TotalSizeTB, 0.001)
 
-	// Old field: derived integer counts only
-	dist := inv.VCenter.VMs.DistributionByComplexity
-	assert.Equal(t, 1, dist["1"])
-	assert.Equal(t, 1, dist["2"])
-	assert.Equal(t, 1, dist["0"])
-
 	// Cluster filter: only cluster-a contains vm-1 and vm-2; vm-3 (cluster-b) must be excluded.
 	clusterEnriched, err := parser.ComplexityDistribution(ctx, Filters{Cluster: "cluster-a"})
 	require.NoError(t, err)

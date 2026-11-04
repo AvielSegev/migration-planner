@@ -1,7 +1,7 @@
 {{- /*
 Resource Breakdowns Query Template - Calculates resource totals split by migrability status.
 
-Returns CPU cores, RAM GB, Disk count, Disk GB, and NIC count, each split by:
+Returns CPU cores, RAM GB, Disk count, and Disk GB, each split by:
 - Total
 - Migratable (no Critical concerns AND no Warning concerns - clean VMs)
 - MigratableWithWarnings (has Warning but no Critical)
@@ -54,18 +54,6 @@ disk_resources AS (
     {{- .VMListFilter}}
     GROUP BY d."VM ID"
 ),
-nic_resources AS (
-    SELECT
-        n."VM ID" as vm_id,
-        COUNT(*) as nic_count
-    FROM vnetwork n
-    JOIN vinfo i ON n."VM ID" = i."VM ID"
-    WHERE 1=1
-      AND COALESCE(i."migration_excluded", false) = false
-    {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
-    {{- .VMListFilter}}
-    GROUP BY n."VM ID"
-),
 combined AS (
     SELECT
         vr.vm_id,
@@ -74,11 +62,9 @@ combined AS (
         vr.has_critical,
         vr.has_warning,
         COALESCE(dr.disk_count, 0) as disk_count,
-        COALESCE(dr.disk_mib, 0) as disk_mib,
-        COALESCE(nr.nic_count, 0) as nic_count
+        COALESCE(dr.disk_mib, 0) as disk_mib
     FROM vm_resources vr
     LEFT JOIN disk_resources dr ON vr.vm_id = dr.vm_id
-    LEFT JOIN nic_resources nr ON vr.vm_id = nr.vm_id
 )
 SELECT
     -- CPU Cores
@@ -100,10 +86,5 @@ SELECT
     COALESCE(ROUND(SUM(disk_mib) / 1024.0), 0)::integer as disk_gb_total,
     COALESCE(ROUND(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_migratable,
     COALESCE(ROUND(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_migratable_warnings,
-    COALESCE(ROUND(SUM(CASE WHEN has_critical = 1 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_not_migratable,
-    -- NIC Count
-    COALESCE(SUM(nic_count), 0)::integer as nic_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN nic_count ELSE 0 END), 0)::integer as nic_migratable,
-    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN nic_count ELSE 0 END), 0)::integer as nic_migratable_warnings,
-    COALESCE(SUM(CASE WHEN has_critical = 1 THEN nic_count ELSE 0 END), 0)::integer as nic_not_migratable
+    COALESCE(ROUND(SUM(CASE WHEN has_critical = 1 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_not_migratable
 FROM combined;

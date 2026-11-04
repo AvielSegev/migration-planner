@@ -243,7 +243,6 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		DistributionByCPUTier:    make(map[string]int),
 		DistributionByMemoryTier: make(map[string]int),
 		DistributionByNICCount:   make(map[string]int),
-		DistributionByComplexity: make(map[string]int),
 		ComplexityDistribution:   make(map[string]inventory.DiskSizeTierSummary),
 		DiskSizeTiers:            make(map[string]inventory.DiskSizeTierSummary),
 		DiskComplexityTiers:      make(map[string]inventory.DiskSizeTierSummary),
@@ -332,7 +331,6 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		vmsData.RamGB = breakdowns.RamGB
 		vmsData.DiskCount = breakdowns.DiskCount
 		vmsData.DiskGB = breakdowns.DiskGB
-		vmsData.NicCount = breakdowns.NicCount
 	} else {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get resource breakdowns: %v", err)
 	}
@@ -365,10 +363,6 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 	complexityDist, err := p.ComplexityDistribution(ctx, filters)
 	if err == nil {
 		vmsData.ComplexityDistribution = complexityDist
-		// Backfill the legacy int field from the same result — no extra query needed.
-		for level, summary := range complexityDist {
-			vmsData.DistributionByComplexity[level] = summary.VMCount
-		}
 	} else {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get complexity distribution: %v", err)
 	}

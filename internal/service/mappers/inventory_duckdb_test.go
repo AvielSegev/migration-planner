@@ -157,12 +157,6 @@ func TestVMsFromDuckDB_ResourceBreakdowns(t *testing.T) {
 					TotalForMigratableWithWarnings: 1500,
 					TotalForNotMigratable:          500,
 				},
-				NicCount: inventory.ResourceBreakdown{
-					Total:                          150,
-					TotalForMigratable:             120,
-					TotalForMigratableWithWarnings: 20,
-					TotalForNotMigratable:          10,
-				},
 			},
 		},
 		{
@@ -205,9 +199,6 @@ func TestVMsFromDuckDB_ResourceBreakdowns(t *testing.T) {
 			// Verify disk GB breakdown
 			assert.Equal(t, tt.input.DiskGB.Total, result.DiskGB.Total)
 
-			// Verify NIC count breakdown
-			require.NotNil(t, result.NicCount)
-			assert.Equal(t, tt.input.NicCount.Total, result.NicCount.Total)
 		})
 	}
 }
@@ -941,7 +932,6 @@ func TestVMsFromDuckDB_Distributions(t *testing.T) {
 			"VMFS": {Type: "VMFS", VMCount: 20, TotalSizeTB: 5.0},
 			"NFS":  {Type: "NFS", VMCount: 5, TotalSizeTB: 1.0},
 		},
-		DistributionByComplexity: map[string]int{"1": 5, "2": 3},
 		ComplexityDistribution: map[string]inventory.DiskSizeTierSummary{
 			"1": {VMCount: 5, TotalSizeTB: 0.05},
 			"2": {VMCount: 3, TotalSizeTB: 1.5},
@@ -979,10 +969,6 @@ func TestVMsFromDuckDB_Distributions(t *testing.T) {
 		assert.Equal(t, expected.VMCount, actual.VmCount)
 		assert.Equal(t, expected.TotalSizeTB, actual.TotalSizeTB)
 	}
-
-	// Verify old integer field is passed through directly
-	require.NotNil(t, result.DistributionByComplexity)
-	assert.Equal(t, input.DistributionByComplexity, *result.DistributionByComplexity)
 
 	// Verify new enriched field
 	require.NotNil(t, result.ComplexityDistribution)

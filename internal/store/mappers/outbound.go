@@ -132,9 +132,11 @@ func UnmarshalInventory(raw []byte, version uint) (model.Inventory, error) {
 			return model.Inventory{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 		}
 		inv := model.Inventory{Vcenter: &data, Clusters: make(map[string]model.InventoryData)}
-		if data.Vcenter != nil {
-			inv.VcenterId = data.Vcenter.Id
+		id, err := storemodel.VCenterIDFromV1Inventory(raw)
+		if err != nil {
+			return model.Inventory{}, fmt.Errorf("failed to decode v1 vCenter ID: %w", err)
 		}
+		inv.VcenterId = id
 		return inv, nil
 	}
 	var inv model.Inventory
