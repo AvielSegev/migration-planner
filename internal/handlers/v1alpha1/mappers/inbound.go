@@ -1,6 +1,10 @@
 package mappers
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	store "github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -199,8 +204,107 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 	return form
 }
 
+func EnhancementDataAPIToModel(assessmentID uuid.UUID, data v1alpha1.EnhancementDataRequest) (*store.AssessmentEnhancementData, error) {
+	m := &store.AssessmentEnhancementData{
+		AssessmentID: assessmentID,
+	}
+
+	if data.DeployedEnvironment != nil {
+		m.DeployedEnvEnvironment = store.TypedStringPtr(data.DeployedEnvironment.Environment)
+	}
+
+	if data.VmwareVersionCounts != nil {
+
+		if err := validateManualCounts(
+			manualCountInput{
+				field:  "PerpetualLicensesCount",
+				number: data.VmwareVersionCounts.PerpetualLicensesCount,
+			},
+			manualCountInput{
+				field:  "CoresLicensingCount",
+				number: data.VmwareVersionCounts.CoresLicensingCount,
+			},
+			manualCountInput{
+				field:  "EnvironmentCount",
+				number: data.VmwareVersionCounts.EnvironmentCount,
+			},
+			manualCountInput{
+				field:  "OtherNodesCount",
+				number: data.VmwareVersionCounts.OtherNodesCount,
+			},
+		); err != nil {
+			return nil, err
+		}
+
+		m.VMwareVerPerpetualLicensesCount = data.VmwareVersionCounts.PerpetualLicensesCount
+	}
+
+	if data.ActiveEnvironments != nil {
+		m.ActiveEnvEnvironments = store.TypedStringSlice(data.ActiveEnvironments.Environments)
+	}
+
+	if data.VmwareSubscription != nil {
+		m.VMwareSubLevel = store.TypedStringSlice(data.VmwareSubscription.Level)
+	}
+
+	if data.VsphereCore != nil {
+		m.VsphereVmEncryptionEnabled = data.VsphereCore.VmEncryptionEnabled
+		m.VsphereVmEncryptionPolicy = data.VsphereCore.VmEncryptionPolicy
+		m.VsphereSrmEnabled = data.VsphereCore.SrmEnabled
+		m.VsphereNiocEnabled = data.VsphereCore.NiocEnabled
+		m.VsphereNiocDetails = data.VsphereCore.NiocDetails
+	}
+
+	if data.Nsx != nil {
+		m.NsxFeatures = store.TypedStringSlice(data.Nsx.Features)
+	}
+
+	if data.AriaOps != nil {
+		m.AriaOpsFeatures = store.TypedStringSlice(data.AriaOps.Features)
+	}
+
+	if data.AriaAutomation != nil {
+		m.AriaAutomationFeatures = store.TypedStringSlice(data.AriaAutomation.Features)
+	}
+
+	if data.AriaSecure != nil {
+		m.AriaSecureFeatures = store.TypedStringSlice(data.AriaSecure.Features)
+	}
+
+	if data.CustomerDetails != nil {
+		m.CustomerPhysicalLocationsCount = data.CustomerDetails.PhysicalLocationsCount
+		m.CustomerTargetHardware = data.CustomerDetails.TargetHardware
+	}
+
+	return m
+}
+
 func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
 	return mappers.InventoryForm{
 		Data: inventory,
 	}
+}
+
+type manualCountInput struct {
+	field  string
+	number *json.Number
+}
+
+func validateManualCounts(inputs ...manualCountInput) error {
+	for _, input := range inputs {
+		if input.number == nil {
+			continue
+		}
+
+		count, err := strconv.ParseInt(input.number.String(), 10, 32)
+		if err != nil || count < 0 {
+
+			if countErr := validator.ManualCountError(input.field); countErr != nil {
+				return countErr
+			}
+			return err
+		}
+	}
+
+	return nil
 }

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
@@ -44,13 +45,18 @@ func (h *ServiceHandler) SaveAssessmentEnhancementData(ctx context.Context, requ
 		return server.SaveAssessmentEnhancementData400JSONResponse{Message: err.Error()}, nil
 	}
 
-	stored, err := h.enhancementDataSrv.Save(ctx, request.Id, *request.Body)
+	model, err := mappers.EnhancementDataAPIToModel(request.Id, *request.Body)
+	if err != nil {
+		return server.SaveAssessmentEnhancementData400JSONResponse{Message: err.Error()}, nil
+	}
+
+	stored, err := h.enhancementDataSrv.Save(ctx, *model)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.SaveAssessmentEnhancementData500JSONResponse{Message: fmt.Sprintf("failed to save enhancement data: %v", err)}, nil
 	}
 
-	return server.SaveAssessmentEnhancementData200JSONResponse(*stored), nil
+	return server.SaveAssessmentEnhancementData200JSONResponse(mappers.EnhancementDataModelToAPI(stored)), nil
 }
 
 // (GET /api/v1/assessments/{id}/enhancement-data)
@@ -82,5 +88,5 @@ func (h *ServiceHandler) GetAssessmentEnhancementData(ctx context.Context, reque
 		return server.GetAssessmentEnhancementData500JSONResponse{Message: fmt.Sprintf("failed to get enhancement data: %v", err)}, nil
 	}
 
-	return server.GetAssessmentEnhancementData200JSONResponse(*stored), nil
+	return server.GetAssessmentEnhancementData200JSONResponse(mappers.EnhancementDataModelToAPI(stored)), nil
 }
